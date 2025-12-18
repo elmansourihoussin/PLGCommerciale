@@ -106,6 +106,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       },
       {
+        path: 'tasks',
+        loadComponent: () => import('./features/tasks/task.component').then(m => m.TaskComponent)
+      },
+      {
         path: 'billing',
         loadComponent: () => import('./features/billing/billing.component').then(m => m.BillingComponent)
       },
