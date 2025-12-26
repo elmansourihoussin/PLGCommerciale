@@ -9,6 +9,10 @@ export interface InvoiceLine {
 export interface Invoice {
   id: string;
   number: string;
+  client?: {
+    id?: string;
+    name?: string;
+  };
   clientId: string;
   clientName?: string;
   title: string;

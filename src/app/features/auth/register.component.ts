@@ -25,26 +25,50 @@ import { AuthService } from '../../core/services/auth.service';
             }
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
               <input
                 type="text"
-                [(ngModel)]="name"
-                name="name"
+                [(ngModel)]="companyName"
+                name="companyName"
                 required
                 class="input"
-                placeholder="Mohammed Alami"
+                placeholder="Atelier Atlas"
               />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
               <input
-                type="email"
-                [(ngModel)]="email"
-                name="email"
+                type="tel"
+                [(ngModel)]="phone"
+                name="phone"
                 required
                 class="input"
-                placeholder="vous@exemple.com"
+                placeholder="0600000000"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Email de l'entreprise</label>
+              <input
+                type="email"
+                [(ngModel)]="companyEmail"
+                name="companyEmail"
+                required
+                class="input"
+                placeholder="contact@atlas.ma"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+              <input
+                type="text"
+                [(ngModel)]="fullName"
+                name="fullName"
+                required
+                class="input"
+                placeholder="Owner Atlas"
               />
             </div>
 
@@ -97,8 +121,10 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class RegisterComponent {
-  name = '';
-  email = '';
+  companyName = '';
+  phone = '';
+  companyEmail = '';
+  fullName = '';
   password = '';
   confirmPassword = '';
   loading = signal(false);
@@ -110,7 +136,7 @@ export class RegisterComponent {
   ) {}
 
   async onSubmit() {
-    if (!this.name || !this.email || !this.password || !this.confirmPassword) {
+    if (!this.companyName || !this.phone || !this.companyEmail || !this.fullName || !this.password || !this.confirmPassword) {
       this.error.set('Veuillez remplir tous les champs');
       return;
     }
@@ -129,7 +155,13 @@ export class RegisterComponent {
     this.error.set('');
 
     try {
-      await this.authService.register(this.email, this.password, this.name);
+      await this.authService.register({
+        companyName: this.companyName,
+        phone: this.phone,
+        companyEmail: this.companyEmail,
+        password: this.password,
+        fullName: this.fullName
+      });
       this.router.navigate(['/dashboard']);
     } catch (err) {
       this.error.set('Une erreur est survenue lors de la création du compte');

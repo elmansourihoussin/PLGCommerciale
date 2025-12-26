@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,6 +20,12 @@ import { ClientService } from '../../core/services/client.service';
         </a>
       </div>
 
+      @if (error()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ error() }}
+        </div>
+      }
+
       <div class="card">
         <div class="mb-6">
           <input
@@ -32,7 +38,12 @@ import { ClientService } from '../../core/services/client.service';
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          @for (client of filteredClients(); track client.id) {
+          @if (loading()) {
+            <div class="col-span-full text-center py-12 text-gray-500">
+              Chargement des clients...
+            </div>
+          } @else {
+            @for (client of filteredClients(); track client.id) {
             <div class="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
               <div class="flex items-start justify-between mb-3">
                 <div class="flex items-center">
@@ -68,7 +79,7 @@ import { ClientService } from '../../core/services/client.service';
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                   </svg>
-                  <span class="line-clamp-2">{{ client.address }}</span>
+                  <span class="line-clamp-2">{{ client.address }} • {{ client.city }}</span>
                 </div>
               </div>
 
@@ -86,23 +97,38 @@ import { ClientService } from '../../core/services/client.service';
                 </button>
               </div>
             </div>
-          } @empty {
+            } @empty {
             <div class="col-span-full text-center py-12">
               <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
               </svg>
               <p class="text-gray-500">Aucun client trouvé</p>
             </div>
+            }
           }
         </div>
       </div>
     </div>
   `
 })
-export class ClientListComponent {
+export class ClientListComponent implements OnInit {
   searchTerm = signal('');
+  loading = signal(false);
+  error = signal('');
 
   constructor(private clientService: ClientService) {}
+
+  async ngOnInit() {
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      await this.clientService.list();
+    } catch (err) {
+      this.error.set('Impossible de charger les clients');
+    } finally {
+      this.loading.set(false);
+    }
+  }
 
   filteredClients = computed(() => {
     let clients = this.clientService.clients();
@@ -123,9 +149,13 @@ export class ClientListComponent {
     this.searchTerm.set(this.searchTerm());
   }
 
-  deleteClient(id: string) {
+  async deleteClient(id: string) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      this.clientService.delete(id);
+      try {
+        await this.clientService.delete(id);
+      } catch (err) {
+        this.error.set('Impossible de supprimer le client');
+      }
     }
   }
 

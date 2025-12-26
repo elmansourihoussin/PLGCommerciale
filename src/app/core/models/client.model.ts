@@ -4,6 +4,7 @@ export interface Client {
   email: string;
   phone: string;
   address: string;
+  city: string;
   ice?: string;
   createdAt: Date;
   updatedAt: Date;

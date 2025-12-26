@@ -1,5 +1,31 @@
 import { Injectable, signal } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Company } from '../models/company.model';
+import { AppConfigService } from '../config/app-config.service';
+import { AuthService } from './auth.service';
+
+interface TenantResponse {
+  data?: ApiTenant;
+  tenant?: ApiTenant;
+}
+
+interface ApiTenant {
+  id?: string;
+  name?: string;
+  companyName?: string;
+  ice?: string;
+  email?: string;
+  companyEmail?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  taxNumber?: string;
+  legalText?: string;
+  legalMentions?: string;
+  website?: string;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -8,44 +34,94 @@ export class CompanyService {
   private companySignal = signal<Company | null>(null);
   company = this.companySignal.asReadonly();
 
-  constructor() {
-    this.loadCompany();
+  constructor(
+    private http: HttpClient,
+    private configService: AppConfigService,
+    private authService: AuthService
+  ) {
+    this.refresh().catch(() => {
+      // Keep cached company if API is unavailable.
+    });
   }
 
-  private loadCompany() {
-    const stored = localStorage.getItem('company');
-    if (stored) {
-      this.companySignal.set(JSON.parse(stored));
-    } else {
-      const mockCompany: Company = {
-        id: '1',
-        name: 'Mon Entreprise',
-        ice: '000123456000070',
-        email: 'contact@monentreprise.ma',
-        phone: '+212 5 22 12 34 56',
-        address: '123 Boulevard Zerktouni',
-        city: 'Casablanca',
-        country: 'Maroc',
-        taxNumber: 'IF12345678',
-        legalText: 'SARL au capital de 100.000 MAD - RC: 123456',
-        website: 'www.monentreprise.ma'
-      };
-      this.companySignal.set(mockCompany);
-      this.saveCompany();
-    }
+  refresh(): Promise<Company | null> {
+    const url = `${this.configService.apiBaseUrl}/api/tenant/me`;
+    return firstValueFrom(this.http.get<TenantResponse | ApiTenant>(url, { headers: this.authHeaders() }))
+      .then((response) => {
+        const current = this.companySignal() ?? {};
+        const company = this.normalizeCompany(response, current);
+        this.companySignal.set(company);
+        return company;
+      })
+      .catch((error) => {
+        if (!this.companySignal()) {
+          throw error;
+        }
+        return this.companySignal();
+      });
   }
 
-  private saveCompany() {
-    localStorage.setItem('company', JSON.stringify(this.companySignal()));
+  update(updates: Partial<Company>): Promise<Company> {
+    const url = `${this.configService.apiBaseUrl}/api/tenant/me`;
+    const payload = this.toApiPayload(updates);
+    return firstValueFrom(this.http.patch<TenantResponse | ApiTenant>(url, payload, { headers: this.authHeaders() }))
+      .then((response) => {
+        const current = this.companySignal() ?? {};
+        const company = this.normalizeCompany(response, { ...current, ...updates });
+        this.companySignal.set(company);
+        return company;
+      });
   }
 
-  update(updates: Partial<Company>): Company {
-    const updated = {
-      ...this.companySignal()!,
-      ...updates
+  private normalizeCompany(response: TenantResponse | ApiTenant, fallback: Partial<Company>): Company {
+    const tenant = this.extractTenant(response);
+
+    return {
+      id: tenant.id ?? fallback.id ?? '1',
+      name: tenant.name ?? tenant.companyName ?? fallback.name ?? '',
+      ice: tenant.ice ?? fallback.ice ?? '',
+      email: tenant.email ?? tenant.companyEmail ?? fallback.email ?? '',
+      phone: tenant.phone ?? fallback.phone ?? '',
+      address: tenant.address ?? fallback.address ?? '',
+      city: tenant.city ?? fallback.city ?? '',
+      country: tenant.country ?? fallback.country ?? '',
+      taxNumber: tenant.taxNumber ?? fallback.taxNumber,
+      legalText: tenant.legalText ?? tenant.legalMentions ?? fallback.legalText,
+      website: tenant.website ?? fallback.website
     };
-    this.companySignal.set(updated);
-    this.saveCompany();
-    return updated;
+  }
+
+  private extractTenant(response: TenantResponse | ApiTenant): ApiTenant {
+    if (this.isTenantResponse(response)) {
+      return response.data ?? response.tenant ?? {};
+    }
+    return response;
+  }
+
+  private isTenantResponse(response: TenantResponse | ApiTenant): response is TenantResponse {
+    return 'data' in response || 'tenant' in response;
+  }
+
+  private toApiPayload(updates: Partial<Company>) {
+    return {
+      name: updates.name,
+      ice: updates.ice,
+      email: updates.email,
+      phone: updates.phone,
+      address: updates.address,
+      city: updates.city,
+      country: updates.country,
+      taxNumber: updates.taxNumber,
+      legalText: updates.legalText,
+      website: updates.website
+    };
+  }
+
+  private authHeaders(): HttpHeaders {
+    const token = this.authService.accessToken();
+    if (!token) {
+      return new HttpHeaders();
+    }
+    return new HttpHeaders({ Authorization: `Bearer ${token}` });
   }
 }

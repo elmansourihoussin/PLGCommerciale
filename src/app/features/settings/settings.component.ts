@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CompanyService } from '../../core/services/company.service';
@@ -44,6 +44,16 @@ import { Company } from '../../core/models/company.model';
         <div class="lg:col-span-2">
           @if (activeTab === 'company') {
             <form (ngSubmit)="saveCompany()" class="space-y-6">
+              @if (companyError()) {
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {{ companyError() }}
+                </div>
+              }
+              @if (companySuccess()) {
+                <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                  {{ companySuccess() }}
+                </div>
+              }
               <div class="card">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations de l'entreprise</h2>
                 <div class="space-y-4">
@@ -165,8 +175,12 @@ import { Company } from '../../core/models/company.model';
               </div>
 
               <div class="flex justify-end">
-                <button type="submit" class="btn-primary">
-                  Enregistrer les modifications
+                <button type="submit" class="btn-primary" [disabled]="companyLoading() || !isCompanyFormValid()">
+                  @if (companyLoading()) {
+                    <span>Enregistrement...</span>
+                  } @else {
+                    <span>Enregistrer les modifications</span>
+                  }
                 </button>
               </div>
             </form>
@@ -236,22 +250,68 @@ export class SettingsComponent implements OnInit {
   activeTab: 'company' | 'profile' = 'company';
   companyData: Partial<Company> = {};
   currentUser = this.authService.currentUser;
+  companyLoading = signal(false);
+  companyError = signal('');
+  companySuccess = signal('');
 
   constructor(
     private companyService: CompanyService,
     private authService: AuthService
   ) {}
 
-  ngOnInit() {
-    const company = this.companyService.company();
-    if (company) {
+  async ngOnInit() {
+    await this.refreshCompany();
+  }
+
+  async saveCompany() {
+    if (!this.isCompanyFormValid()) {
+      this.companyError.set('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+    this.companyLoading.set(true);
+    this.companyError.set('');
+    this.companySuccess.set('');
+    try {
+      const company = await this.companyService.update(this.companyData);
       this.companyData = { ...company };
+      this.companySuccess.set('Les informations de l\'entreprise ont été enregistrées');
+    } catch (error) {
+      this.companyError.set('Impossible d\'enregistrer les informations de l\'entreprise');
+    } finally {
+      this.companyLoading.set(false);
     }
   }
 
-  saveCompany() {
-    this.companyService.update(this.companyData);
-    alert('Les informations de l\'entreprise ont été enregistrées');
+  private async refreshCompany() {
+    this.companyLoading.set(true);
+    this.companyError.set('');
+    try {
+      const company = await this.companyService.refresh();
+      if (company) {
+        this.companyData = { ...company };
+      }
+    } catch (error) {
+      this.companyError.set('Impossible de charger les informations de l\'entreprise');
+    } finally {
+      this.companyLoading.set(false);
+    }
+  }
+
+  isCompanyFormValid(): boolean {
+    const requiredFields: Array<keyof Company> = [
+      'name',
+      'ice',
+      'email',
+      'phone',
+      'address',
+      'city',
+      'country'
+    ];
+
+    return requiredFields.every((field) => {
+      const value = this.companyData[field];
+      return typeof value === 'string' && value.trim().length > 0;
+    });
   }
 
   getUserInitials(): string {
@@ -261,7 +321,13 @@ export class SettingsComponent implements OnInit {
 
   getRoleLabel(): string {
     const role = this.currentUser()?.role;
-    return role === 'admin' ? 'Administrateur' : 'Utilisateur';
+    if (role === 'admin') {
+      return 'Administrateur';
+    }
+    if (role === 'owner') {
+      return 'Propriétaire';
+    }
+    return 'Utilisateur';
   }
 
   formatDate(date?: Date): string {

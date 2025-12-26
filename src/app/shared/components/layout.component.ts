@@ -11,7 +11,7 @@ import { HeaderComponent } from './header.component';
     <div class="min-h-screen bg-gray-50">
       <app-sidebar #sidebar />
 
-      <div class="lg:pl-64">
+      <div class="layout-content">
         <app-header (menuToggle)="toggleSidebar()" />
 
         <main class="p-6">

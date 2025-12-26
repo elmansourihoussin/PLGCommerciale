@@ -190,13 +190,15 @@ export class CheckFormComponent implements OnInit {
     }
   }
 
-  onSubmit() {
+  async onSubmit() {
     if (!this.formData.beneficiary || !this.formData.amount) {
       alert('Veuillez remplir tous les champs requis');
       return;
     }
 
-    const client = this.formData.clientId ? this.clientService.getById(this.formData.clientId) : null;
+    const client = this.formData.clientId
+      ? await this.clientService.getById(this.formData.clientId)
+      : null;
     const checkData = {
       clientId: this.formData.clientId,
       clientName: client?.name,

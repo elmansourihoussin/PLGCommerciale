@@ -6,6 +6,10 @@
   body {
     @apply bg-gray-50 text-gray-900;
   }
+
+  :root {
+    --sidebar-width: 16rem;
+  }
 }
 
 @layer components {
@@ -71,5 +75,16 @@
 
   .badge-info {
     @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .layout-content {
+    padding-left: 0;
+  }
+
+  @media (min-width: 1024px) {
+    .layout-content {
+      padding-left: var(--sidebar-width, 16rem);
+      transition: padding-left 0.3s ease;
+    }
   }
 }

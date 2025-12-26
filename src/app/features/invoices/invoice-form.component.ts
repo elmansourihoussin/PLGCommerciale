@@ -18,6 +18,12 @@ import { InvoiceLine } from '../../core/models/invoice.model';
         </h1>
       </div>
 
+      @if (clientsError()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ clientsError() }}
+        </div>
+      }
+
       <form (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
@@ -26,8 +32,12 @@ import { InvoiceLine } from '../../core/models/invoice.model';
               <label class="block text-sm font-medium text-gray-700 mb-2">Client *</label>
               <select [(ngModel)]="formData.clientId" name="clientId" required class="input">
                 <option value="">Sélectionner un client</option>
-                @for (client of clients(); track client.id) {
-                  <option [value]="client.id">{{ client.name }}</option>
+                @if (clientsLoading()) {
+                  <option value="" disabled>Chargement...</option>
+                } @else {
+                  @for (client of clients(); track client.id) {
+                    <option [value]="client.id">{{ client.name }}</option>
+                  }
                 }
               </select>
             </div>
@@ -231,6 +241,8 @@ import { InvoiceLine } from '../../core/models/invoice.model';
 export class InvoiceFormComponent implements OnInit {
   isEdit = signal(false);
   clients = this.clientService.clients;
+  clientsLoading = signal(false);
+  clientsError = signal('');
 
   formData: any = {
     clientId: '',
@@ -258,25 +270,39 @@ export class InvoiceFormComponent implements OnInit {
     private router: Router
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
+    await this.loadClients();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
-      this.loadInvoice(id);
+      await this.loadInvoice(id);
     } else {
       this.addLine();
     }
   }
 
-  loadInvoice(id: string) {
-    const invoice = this.invoiceService.getById(id);
-    if (invoice) {
-      this.formData = {
-        ...invoice,
-        date: new Date(invoice.date).toISOString().split('T')[0],
-        dueDate: new Date(invoice.dueDate).toISOString().split('T')[0]
-      };
-      this.calculateTotals();
+  async loadInvoice(id: string) {
+    const invoice = await this.invoiceService.getById(id);
+    const rawTaxRate = invoice.taxRate ?? this.formData.taxRate;
+    this.formData = {
+      ...invoice,
+      date: new Date(invoice.date).toISOString().split('T')[0],
+      dueDate: new Date(invoice.dueDate).toISOString().split('T')[0],
+      taxRate: rawTaxRate <= 1 ? rawTaxRate * 100 : rawTaxRate,
+      paymentMethod: this.mapPaymentMethodFromApi(invoice.paymentMethod)
+    };
+    this.calculateTotals();
+  }
+
+  private async loadClients() {
+    this.clientsLoading.set(true);
+    this.clientsError.set('');
+    try {
+      await this.clientService.list();
+    } catch (err) {
+      this.clientsError.set('Impossible de charger les clients');
+    } finally {
+      this.clientsLoading.set(false);
     }
   }
 
@@ -312,34 +338,32 @@ export class InvoiceFormComponent implements OnInit {
     });
   }
 
-  onSubmit() {
+  async onSubmit() {
     if (!this.formData.clientId || !this.formData.title || this.formData.lines.length === 0) {
       alert('Veuillez remplir tous les champs requis et ajouter au moins une ligne');
       return;
     }
 
-    const client = this.clientService.getById(this.formData.clientId);
     const invoiceData = {
       clientId: this.formData.clientId,
-      clientName: client?.name,
       title: this.formData.title,
-      date: new Date(this.formData.date),
-      dueDate: new Date(this.formData.dueDate),
-      lines: this.formData.lines,
-      subtotal: this.totals().subtotal,
-      taxRate: this.formData.taxRate,
-      taxAmount: this.totals().taxAmount,
-      total: this.totals().total,
+      note: this.formData.notes,
+      paymentMethod: this.mapPaymentMethod(this.formData.paymentMethod),
+      invoiceDate: new Date(this.formData.date).toISOString().split('T')[0],
+      dueDate: new Date(this.formData.dueDate).toISOString().split('T')[0],
+      taxRate: this.normalizeTaxRate(this.formData.taxRate),
       status: this.formData.status,
-      paymentMethod: this.formData.paymentMethod,
-      paidAmount: this.formData.paidAmount,
-      notes: this.formData.notes
+      items: this.formData.lines.map((line: InvoiceLine) => ({
+        label: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice
+      }))
     };
 
     if (this.isEdit()) {
-      this.invoiceService.update(this.route.snapshot.paramMap.get('id')!, invoiceData);
+      await this.invoiceService.update(this.route.snapshot.paramMap.get('id')!, invoiceData);
     } else {
-      this.invoiceService.create(invoiceData as any);
+      await this.invoiceService.create(invoiceData as any);
     }
 
     this.router.navigate(['/invoices']);
@@ -347,5 +371,34 @@ export class InvoiceFormComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/invoices']);
+  }
+
+  private normalizeTaxRate(value: number): number {
+    if (value > 1) {
+      return value / 100;
+    }
+    return value;
+  }
+
+  private mapPaymentMethod(value?: string): string | undefined {
+    if (!value) return undefined;
+    const map: Record<string, string> = {
+      bank_transfer: 'Virement',
+      card: 'Carte',
+      cash: 'Espèces',
+      check: 'Chèque'
+    };
+    return map[value] ?? value;
+  }
+
+  private mapPaymentMethodFromApi(value?: string): string {
+    if (!value) return '';
+    const map: Record<string, string> = {
+      Virement: 'bank_transfer',
+      Carte: 'card',
+      Espèces: 'cash',
+      Chèque: 'check'
+    };
+    return map[value] ?? value;
   }
 }

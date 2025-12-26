@@ -288,13 +288,13 @@ export class QuoteFormComponent implements OnInit {
     });
   }
 
-  onSubmit() {
+  async onSubmit() {
     if (!this.formData.clientId || !this.formData.title || this.formData.lines.length === 0) {
       alert('Veuillez remplir tous les champs requis et ajouter au moins une ligne');
       return;
     }
 
-    const client = this.clientService.getById(this.formData.clientId);
+    const client = await this.clientService.getById(this.formData.clientId);
     const quoteData = {
       clientId: this.formData.clientId,
       clientName: client?.name,

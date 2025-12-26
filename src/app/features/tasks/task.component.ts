@@ -7,6 +7,12 @@ type TaskProgress = {
   status: Record<string, boolean>;
 };
 
+type WeekDay = {
+  label: string;
+  dayNumber: number | null;
+  dateKey: string | null;
+};
+
 @Component({
   selector: 'app-task',
   standalone: true,
@@ -47,7 +53,7 @@ type TaskProgress = {
 
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm text-gray-600">Semaines :</span>
-            @for (week of weeks; track week) {
+            @for (week of weeksList(); track week) {
               <button
                 class="px-3 py-1 rounded-lg border text-sm transition-colors"
                 [class.bg-primary-600]="week === selectedWeek()"
@@ -68,11 +74,16 @@ type TaskProgress = {
             <thead>
               <tr>
                 <th class="w-48 sticky left-0 bg-gray-50 z-20">Tâche</th>
-                @for (day of days; track day) {
+                @for (day of weekDays(); track day.dateKey ?? day.label) {
                   <th class="text-center" [class.bg-primary-50]="isCurrentDay(day)">
                     <div class="flex flex-col items-center gap-1">
-                      <span class="font-medium" [class.text-primary-700]="isCurrentDay(day)">{{ day }}</span>
-                      <span class="text-xs text-gray-500" [class.text-primary-700]="isCurrentDay(day)">{{ dayCompletion(day) }}%</span>
+                      <span class="font-medium" [class.text-primary-700]="isCurrentDay(day)">{{ day.label }}</span>
+                      <span class="text-xs text-gray-500" [class.text-primary-700]="isCurrentDay(day)">
+                        {{ day.dayNumber ?? '-' }}
+                      </span>
+                      <span class="text-[10px] text-gray-500">
+                        {{ dayCompletion(day) }}%
+                      </span>
                       @if (isCurrentDay(day)) {
                         <span class="text-[10px] font-semibold text-primary-700 uppercase tracking-wide">Aujourd'hui</span>
                       }
@@ -85,14 +96,15 @@ type TaskProgress = {
               @for (task of tasks(); track task.name; let taskIndex = $index) {
                 <tr>
                   <td class="font-medium text-gray-900 sticky left-0 bg-white z-10">{{ task.name }}</td>
-                  @for (day of days; track day) {
+                  @for (day of weekDays(); track day.dateKey ?? day.label) {
                     <td class="text-center" [class.bg-primary-50]="isCurrentDay(day)">
                       <label class="inline-flex items-center justify-center cursor-pointer">
                         <input
                           type="checkbox"
                           class="h-4 w-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                          [checked]="task.status[day]"
-                          (change)="toggleTask(taskIndex, day)"
+                          [checked]="isTaskChecked(task, day.dateKey)"
+                          [disabled]="!day.dateKey"
+                          (change)="toggleTask(taskIndex, day.dateKey)"
                         />
                       </label>
                     </td>
@@ -100,7 +112,7 @@ type TaskProgress = {
                 </tr>
               }
               <tr>
-                <td [attr.colspan]="days.length + 1" class="p-4 bg-gray-50">
+                <td [attr.colspan]="weekDays().length + 1" class="p-4 bg-gray-50">
                   <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                     <input
                       type="text"
@@ -123,18 +135,36 @@ type TaskProgress = {
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-gray-200">
           <div class="flex-1">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-sm text-gray-600">Progression globale</span>
-              <span class="text-sm font-semibold text-gray-900">{{ completionRate() }}%</span>
+              <span class="text-sm text-gray-600">État global — semaine sélectionnée</span>
+              <span class="text-sm font-semibold text-gray-900">{{ weekCompletion() }}%</span>
             </div>
             <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 class="h-full bg-primary-600 transition-all duration-300"
-                [style.width.%]="completionRate()"
+                [style.width.%]="weekCompletion()"
               ></div>
             </div>
           </div>
           <div class="text-sm text-gray-700">
-            {{ tasksDoneCount() }} / {{ totalTasksCount() }} cases cochées
+            {{ weekTasksDoneCount() }} / {{ weekTotalTasksCount() }} cases cochées
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+          <div class="flex-1">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-600">État global — mois sélectionné</span>
+              <span class="text-sm font-semibold text-gray-900">{{ monthCompletion() }}%</span>
+            </div>
+            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-primary-600 transition-all duration-300"
+                [style.width.%]="monthCompletion()"
+              ></div>
+            </div>
+          </div>
+          <div class="text-sm text-gray-700">
+            {{ monthTasksDoneCount() }} / {{ monthTotalTasksCount() }} cases cochées
           </div>
         </div>
       </div>
@@ -142,9 +172,16 @@ type TaskProgress = {
   `
 })
 export class TaskComponent {
-  days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+  private readonly dayLabels = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-  weeks = [1, 2, 3, 4, 5];
+  todayKey = this.formatDateKey(new Date());
+  selectedMonth = signal(new Date().getMonth());
+  selectedYear = signal(new Date().getFullYear());
+  selectedWeek = signal(this.getWeekOfMonth(new Date()));
+
+  weeksCount = computed(() => this.computeWeeksInMonth(this.selectedYear(), this.selectedMonth()));
+  weeksList = computed(() => Array.from({ length: this.weeksCount() }, (_, i) => i + 1));
+  weekDays = computed(() => this.computeWeekDays(this.selectedYear(), this.selectedMonth(), this.selectedWeek()));
 
   tasks = signal<TaskProgress[]>([
     { name: 'Prospection', status: this.createEmptyStatus() },
@@ -155,49 +192,76 @@ export class TaskComponent {
   ]);
   newTaskName = '';
   formError = signal('');
-  currentDay = this.getToday();
-  selectedMonth = signal(new Date().getMonth());
-  selectedYear = signal(new Date().getFullYear());
-  selectedWeek = signal(this.getWeekOfMonth(new Date()));
 
   currentMonthYearLabel = computed(() => `${this.months[this.selectedMonth()]} ${this.selectedYear()}`);
 
-  completionRate = computed(() => {
-    const total = this.totalTasksCount();
+  weekCompletion = computed(() => {
+    const total = this.weekTotalTasksCount();
     if (total === 0) return 0;
-    return Math.round((this.tasksDoneCount() / total) * 100);
+    return Math.round((this.weekTasksDoneCount() / total) * 100);
   });
 
-  tasksDoneCount = computed(() => {
+  weekTasksDoneCount = computed(() => {
+    const validDays = this.weekDays().filter(d => d.dateKey);
     return this.tasks().reduce((sum, task) => {
-      return sum + this.days.filter(day => task.status[day]).length;
+      return sum + validDays.filter(day => day.dateKey && task.status[day.dateKey]).length;
     }, 0);
   });
 
-  totalTasksCount = computed(() => this.tasks().length * this.days.length);
+  weekTotalTasksCount = computed(() => {
+    const validDays = this.weekDays().filter(d => d.dateKey);
+    return this.tasks().length * validDays.length;
+  });
 
-  dayCompletion(day: string): number {
+  monthTasksDoneCount = computed(() => {
+    const daysInMonth = this.getDaysInMonth(this.selectedYear(), this.selectedMonth());
+    return this.tasks().reduce((sum, task) => {
+      let taskSum = 0;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const key = this.formatDateKey(new Date(this.selectedYear(), this.selectedMonth(), day));
+        if (task.status[key]) taskSum++;
+      }
+      return sum + taskSum;
+    }, 0);
+  });
+
+  monthTotalTasksCount = computed(() => this.tasks().length * this.getDaysInMonth(this.selectedYear(), this.selectedMonth()));
+
+  monthCompletion = computed(() => {
+    const total = this.monthTotalTasksCount();
+    if (total === 0) return 0;
+    return Math.round((this.monthTasksDoneCount() / total) * 100);
+  });
+
+  dayCompletion(day: WeekDay): number {
+    if (!day.dateKey) return 0;
     const totalTasks = this.tasks().length;
     if (totalTasks === 0) return 0;
-    const done = this.tasks().filter(task => task.status[day]).length;
+    const done = this.tasks().filter(task => task.status[day.dateKey as string]).length;
     return Math.round((done / totalTasks) * 100);
   }
 
-  toggleTask(taskIndex: number, day: string) {
+  toggleTask(taskIndex: number, dateKey: string | null) {
+    if (!dateKey) return;
     this.tasks.update(tasks =>
       tasks.map((task, index) =>
         index === taskIndex
           ? {
               ...task,
-              status: { ...task.status, [day]: !task.status[day] }
+              status: { ...task.status, [dateKey]: !task.status[dateKey] }
             }
           : task
       )
     );
   }
 
-  isCurrentDay(day: string) {
-    return day === this.currentDay;
+  isCurrentDay(day: WeekDay) {
+    return day.dateKey === this.todayKey;
+  }
+
+  isTaskChecked(task: TaskProgress, dateKey: string | null) {
+    if (!dateKey) return false;
+    return !!task.status[dateKey];
   }
 
   setWeek(week: number) {
@@ -216,6 +280,7 @@ export class TaskComponent {
       }
       return next;
     });
+    this.ensureWeekInRange();
   }
 
   addTask() {
@@ -231,19 +296,83 @@ export class TaskComponent {
   }
 
   private createEmptyStatus(prechecked: Partial<Record<string, boolean>> = {}) {
-    return this.days.reduce<Record<string, boolean>>((status, day) => {
-      status[day] = prechecked[day] ?? false;
-      return status;
-    }, {});
+    const status: Record<string, boolean> = {};
+    const currentWeek = this.weekDays();
+
+    currentWeek.forEach(day => {
+      if (day.dateKey) {
+        status[day.dateKey] = false;
+      }
+    });
+
+    Object.entries(prechecked).forEach(([label, value]) => {
+      const match = currentWeek.find(d => d.label === label);
+      if (match?.dateKey) {
+        status[match.dateKey] = value ?? false;
+      }
+    });
+
+    return status;
   }
 
-  private getToday(): string {
-    const today = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }).format(new Date());
-    return today.charAt(0).toUpperCase() + today.slice(1);
+  private ensureWeekInRange() {
+    const maxWeek = this.weeksCount();
+    if (this.selectedWeek() > maxWeek) {
+      this.selectedWeek.set(maxWeek);
+    }
+  }
+
+  private computeWeekDays(year: number, month: number, weekNumber: number): WeekDay[] {
+    const firstOfMonth = new Date(year, month, 1);
+    const isoDay = firstOfMonth.getDay() === 0 ? 7 : firstOfMonth.getDay(); // 1 (Mon) - 7 (Sun)
+    const firstMonday = new Date(firstOfMonth);
+    firstMonday.setDate(firstOfMonth.getDate() - (isoDay - 1));
+
+    const start = new Date(firstMonday);
+    start.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+
+      const inMonth = date.getMonth() === month;
+      return {
+        label: this.dayLabels[date.getDay()],
+        dayNumber: inMonth ? date.getDate() : null,
+        dateKey: inMonth ? this.formatDateKey(date) : null
+      };
+    });
+  }
+
+  private computeWeeksInMonth(year: number, month: number): number {
+    const firstOfMonth = new Date(year, month, 1);
+    const lastOfMonth = new Date(year, month + 1, 0);
+
+    const isoStart = firstOfMonth.getDay() === 0 ? 7 : firstOfMonth.getDay();
+    const isoEnd = lastOfMonth.getDay() === 0 ? 7 : lastOfMonth.getDay();
+
+    const leadingDays = isoStart - 1;
+    const trailingDays = 7 - isoEnd;
+    const daysShown = leadingDays + lastOfMonth.getDate() + trailingDays;
+
+    return Math.ceil(daysShown / 7);
+  }
+
+  private getDaysInMonth(year: number, month: number) {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
+  private formatDateKey(date: Date) {
+    const y = date.getFullYear();
+    const m = `${date.getMonth() + 1}`.padStart(2, '0');
+    const d = `${date.getDate()}`.padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   private getWeekOfMonth(date: Date) {
-    const day = date.getDate();
-    return Math.min(5, Math.max(1, Math.ceil(day / 7)));
+    const firstOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const isoStart = firstOfMonth.getDay() === 0 ? 7 : firstOfMonth.getDay();
+    const offset = isoStart - 1;
+    return Math.ceil((date.getDate() + offset) / 7);
   }
 }

@@ -17,6 +17,11 @@ import { ClientService } from '../../core/services/client.service';
       </div>
 
       <form (ngSubmit)="onSubmit()" class="space-y-6">
+        @if (error()) {
+          <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {{ error() }}
+          </div>
+        }
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations du client</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -69,6 +74,18 @@ import { ClientService } from '../../core/services/client.service';
             </div>
 
             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Ville *</label>
+              <input
+                type="text"
+                [(ngModel)]="formData.city"
+                name="city"
+                required
+                class="input"
+                placeholder="Casablanca"
+              />
+            </div>
+
+            <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">ICE</label>
               <input
                 type="text"
@@ -85,8 +102,12 @@ import { ClientService } from '../../core/services/client.service';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary">
-            {{ isEdit() ? 'Mettre à jour' : 'Créer le client' }}
+          <button type="submit" class="btn-primary" [disabled]="loading()">
+            @if (loading()) {
+              <span>Enregistrement...</span>
+            } @else {
+              <span>{{ isEdit() ? 'Mettre à jour' : 'Créer le client' }}</span>
+            }
           </button>
         </div>
       </form>
@@ -95,12 +116,22 @@ import { ClientService } from '../../core/services/client.service';
 })
 export class ClientFormComponent implements OnInit {
   isEdit = signal(false);
+  loading = signal(false);
+  error = signal('');
 
-  formData: any = {
+  formData: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    ice?: string;
+  } = {
     name: '',
     email: '',
     phone: '',
     address: '',
+    city: '',
     ice: ''
   };
 
@@ -110,34 +141,48 @@ export class ClientFormComponent implements OnInit {
     private router: Router
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
-      this.loadClient(id);
+      await this.loadClient(id);
     }
   }
 
-  loadClient(id: string) {
-    const client = this.clientService.getById(id);
-    if (client) {
-      this.formData = { ...client };
+  async loadClient(id: string) {
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      const client = await this.clientService.getById(id);
+      const { name, email, phone, address, city, ice } = client;
+      this.formData = { name, email, phone, address, city, ice };
+    } catch (err) {
+      this.error.set('Impossible de charger le client');
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  onSubmit() {
-    if (!this.formData.name || !this.formData.email || !this.formData.phone || !this.formData.address) {
-      alert('Veuillez remplir tous les champs requis');
+  async onSubmit() {
+    if (!this.formData.name || !this.formData.email || !this.formData.phone || !this.formData.address || !this.formData.city) {
+      this.error.set('Veuillez remplir tous les champs requis');
       return;
     }
 
-    if (this.isEdit()) {
-      this.clientService.update(this.route.snapshot.paramMap.get('id')!, this.formData);
-    } else {
-      this.clientService.create(this.formData);
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      if (this.isEdit()) {
+        await this.clientService.update(this.route.snapshot.paramMap.get('id')!, this.formData);
+      } else {
+        await this.clientService.create(this.formData);
+      }
+      this.router.navigate(['/clients']);
+    } catch (err) {
+      this.error.set(this.isEdit() ? 'Impossible de mettre à jour le client' : 'Impossible de créer le client');
+    } finally {
+      this.loading.set(false);
     }
-
-    this.router.navigate(['/clients']);
   }
 
   goBack() {
