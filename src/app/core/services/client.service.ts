@@ -24,6 +24,7 @@ interface ApiClient {
   address?: string;
   city?: string;
   ice?: string;
+  invoicesCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -66,13 +67,14 @@ export class ClientService {
     const url = `${this.configService.apiBaseUrl}/api/clients/${encodeURIComponent(id)}`;
     return firstValueFrom(this.http.get<ClientResponse | ApiClient>(url, { headers: this.authHeaders() }))
       .then((response) => {
-        const client = this.normalizeClient(response, {
+        const fallback: Partial<Client> = {
           name: '',
           email: '',
           phone: '',
           address: '',
           city: ''
-        });
+        };
+        const client = this.normalizeClient(response, fallback);
         this.upsertClient(client);
         return client;
       });
@@ -93,14 +95,15 @@ export class ClientService {
     return firstValueFrom(this.http.patch<ClientResponse | ApiClient>(url, updates, { headers: this.authHeaders() }))
       .then((response) => {
         const current = this.clientsSignal().find(c => c.id === id);
-        const updated = this.normalizeClient(response, {
+        const fallback: Partial<Client> = {
           name: current?.name ?? '',
           email: current?.email ?? '',
           phone: current?.phone ?? '',
           address: current?.address ?? '',
           city: current?.city ?? '',
           ice: current?.ice ?? ''
-        });
+        };
+        const updated = this.normalizeClient(response, fallback);
         this.upsertClient(updated);
         return updated;
       });
@@ -114,16 +117,17 @@ export class ClientService {
       });
   }
 
-  private normalizeClient(response: ClientResponse | ApiClient, fallback: CreateClientPayload): Client {
+  private normalizeClient(response: ClientResponse | ApiClient, fallback: Partial<Client>): Client {
     const client = this.extractClient(response);
     return {
       id: client.id ?? Date.now().toString(),
-      name: client.name ?? fallback.name,
-      email: client.email ?? fallback.email,
-      phone: client.phone ?? fallback.phone,
-      address: client.address ?? fallback.address,
-      city: client.city ?? fallback.city,
+      name: client.name ?? fallback.name ?? '',
+      email: client.email ?? fallback.email ?? '',
+      phone: client.phone ?? fallback.phone ?? '',
+      address: client.address ?? fallback.address ?? '',
+      city: client.city ?? fallback.city ?? '',
       ice: client.ice ?? fallback.ice,
+      invoicesCount: client.invoicesCount ?? fallback.invoicesCount,
       createdAt: client.createdAt ? new Date(client.createdAt) : new Date(),
       updatedAt: client.updatedAt ? new Date(client.updatedAt) : new Date()
     };
@@ -140,14 +144,18 @@ export class ClientService {
     const list = Array.isArray(response)
       ? response
       : response.data ?? response.clients ?? [];
-    return list.map((client) => this.normalizeClient(client, {
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: client.city ?? '',
-      ice: client.ice
-    }));
+    return list.map((client) => {
+      const fallback: Partial<Client> = {
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: client.city ?? '',
+        ice: client.ice,
+        invoicesCount: client.invoicesCount
+      };
+      return this.normalizeClient(client, fallback);
+    });
   }
 
   private upsertClient(client: Client) {

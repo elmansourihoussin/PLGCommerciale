@@ -20,10 +20,14 @@ import { InvoiceService } from '../../core/services/invoice.service';
         </a>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div class="card">
           <p class="text-sm text-gray-600">Total facturé</p>
           <p class="mt-2 text-2xl font-bold text-gray-900">{{ formatAmount(stats().totalAmount) }} MAD</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Reste à payer</p>
+          <p class="mt-2 text-2xl font-bold text-red-600">{{ formatAmount(stats().balanceDueTotal) }} MAD</p>
         </div>
         <div class="card">
           <p class="text-sm text-gray-600">Payées</p>
@@ -184,9 +188,12 @@ export class InvoiceListComponent implements OnInit {
     const invoices = this.invoiceService.invoices();
     const totalInvoicesAmount = this.invoiceService.totalInvoicesAmount();
     const totalPaidAmount = this.invoiceService.totalPaidAmount();
+    const paidTotal = totalPaidAmount ?? invoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
+    const invoicesTotal = totalInvoicesAmount ?? invoices.reduce((sum, inv) => sum + inv.total, 0);
     return {
-      totalAmount: totalInvoicesAmount ?? invoices.reduce((sum, inv) => sum + inv.total, 0),
-      totalPaidAmount: totalPaidAmount ?? invoices.reduce((sum, inv) => sum + inv.paidAmount, 0),
+      totalAmount: invoicesTotal,
+      totalPaidAmount: paidTotal,
+      balanceDueTotal: Math.max(0, invoicesTotal - paidTotal),
       paidCount: invoices.filter(inv => inv.status === 'paid').length,
       unpaidCount: invoices.filter(inv => inv.status === 'unpaid').length,
       overdueCount: invoices.filter(inv => inv.status === 'overdue').length

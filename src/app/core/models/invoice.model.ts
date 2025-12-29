@@ -4,6 +4,7 @@ export interface InvoiceLine {
   quantity: number;
   unitPrice: number;
   total: number;
+  taxRate?: number;
 }
 
 export interface Invoice {
@@ -20,7 +21,7 @@ export interface Invoice {
   dueDate: Date;
   lines: InvoiceLine[];
   subtotal: number;
-  taxRate: number;
+  defaultTaxRate?: number;
   taxAmount: number;
   total: number;
   paidAmount: number;

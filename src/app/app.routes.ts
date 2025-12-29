@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   {
@@ -100,13 +101,40 @@ export const routes: Routes = [
             loadComponent: () => import('./features/clients/client-form.component').then(m => m.ClientFormComponent)
           },
           {
+            path: ':id',
+            loadComponent: () => import('./features/clients/client-detail.component').then(m => m.ClientDetailComponent)
+          },
+          {
             path: ':id/edit',
             loadComponent: () => import('./features/clients/client-form.component').then(m => m.ClientFormComponent)
           }
         ]
       },
       {
+        path: 'users',
+        canActivate: [adminGuard],
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/users/user-list.component').then(m => m.UserListComponent)
+          },
+          {
+            path: 'new',
+            loadComponent: () => import('./features/users/user-form.component').then(m => m.UserFormComponent)
+          },
+          {
+            path: ':id/edit',
+            loadComponent: () => import('./features/users/user-form.component').then(m => m.UserFormComponent)
+          }
+        ]
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+      },
+      {
         path: 'settings',
+        canActivate: [adminGuard],
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       },
       {
@@ -115,6 +143,7 @@ export const routes: Routes = [
       },
       {
         path: 'billing',
+        canActivate: [adminGuard],
         loadComponent: () => import('./features/billing/billing.component').then(m => m.BillingComponent)
       },
       {

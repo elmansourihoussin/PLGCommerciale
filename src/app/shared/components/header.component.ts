@@ -1,4 +1,4 @@
-import { Component, output, signal } from '@angular/core';
+import { Component, computed, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
@@ -72,12 +72,14 @@ import { AuthService } from '../../core/services/auth.service';
 
           @if (showDropdown) {
             <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a (click)="navigateTo('/settings')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+              <a (click)="navigateTo('/profile')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
                 Mon profil
               </a>
-              <a (click)="navigateTo('/billing')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
-                Abonnement
-              </a>
+              @if (isAdmin()) {
+                <a (click)="navigateTo('/billing')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                  Abonnement
+                </a>
+              }
               <div class="border-t border-gray-200 my-1"></div>
               <button (click)="logout()" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
                 Déconnexion
@@ -103,6 +105,11 @@ export class HeaderComponent {
     private authService: AuthService,
     private router: Router
   ) {}
+
+  isAdmin = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'owner' || role === 'admin';
+  });
 
   toggleDropdown() {
     this.showDropdown = !this.showDropdown;

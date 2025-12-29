@@ -6,6 +6,7 @@ export interface Client {
   address: string;
   city: string;
   ice?: string;
+  invoicesCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }

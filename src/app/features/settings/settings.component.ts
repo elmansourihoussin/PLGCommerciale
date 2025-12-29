@@ -1,14 +1,16 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { UserListComponent } from '../users/user-list.component';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
+import { UserService } from '../../core/services/user.service';
 import { Company } from '../../core/models/company.model';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UserListComponent],
   template: `
     <div class="space-y-6">
       <h1 class="text-2xl font-bold text-gray-900">Paramètres</h1>
@@ -37,6 +39,18 @@ import { Company } from '../../core/models/company.model';
                 </svg>
                 Mon profil
               </button>
+              @if (isAdmin()) {
+                <button
+                  (click)="activeTab = 'users'"
+                  [class]="activeTab === 'users' ? 'bg-primary-50 text-primary-700' : 'text-gray-700 hover:bg-gray-100'"
+                  class="w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center"
+                >
+                  <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4a4 4 0 11-8 0 4 4 0 018 0zm0 10c-4.418 0-8 1.79-8 4v2h16v-2c0-2.21-3.582-4-8-4z"/>
+                  </svg>
+                  Utilisateurs
+                </button>
+              }
             </nav>
           </div>
         </div>
@@ -234,12 +248,72 @@ import { Company } from '../../core/models/company.model';
                 </div>
 
                 <div class="pt-4">
-                  <button class="btn-outline w-full">
-                    Modifier le mot de passe
+                  <button class="btn-outline w-full" (click)="showPasswordForm.set(!showPasswordForm())">
+                    @if (showPasswordForm()) {
+                      <span>Masquer le mot de passe</span>
+                    } @else {
+                      <span>Modifier le mot de passe</span>
+                    }
                   </button>
                 </div>
+
+                @if (showPasswordForm()) {
+                  <div class="pt-4">
+                    @if (passwordError()) {
+                      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        {{ passwordError() }}
+                      </div>
+                    }
+                    @if (passwordSuccess()) {
+                      <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                        {{ passwordSuccess() }}
+                      </div>
+                    }
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe actuel</label>
+                        <input
+                          type="password"
+                          [(ngModel)]="passwordForm.currentPassword"
+                          name="currentPassword"
+                          class="input"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
+                        <input
+                          type="password"
+                          [(ngModel)]="passwordForm.newPassword"
+                          name="newPassword"
+                          class="input"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
+                        <input
+                          type="password"
+                          [(ngModel)]="passwordForm.confirmPassword"
+                          name="confirmPassword"
+                          class="input"
+                        />
+                      </div>
+                      <button class="btn-outline w-full" [disabled]="passwordLoading()" (click)="changeMyPassword()">
+                        @if (passwordLoading()) {
+                          <span>Enregistrement...</span>
+                        } @else {
+                          <span>Changer le mot de passe</span>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                }
+
               </div>
             </div>
+          }
+
+          @if (activeTab === 'users' && isAdmin()) {
+            <app-user-list />
           }
         </div>
       </div>
@@ -247,16 +321,30 @@ import { Company } from '../../core/models/company.model';
   `
 })
 export class SettingsComponent implements OnInit {
-  activeTab: 'company' | 'profile' = 'company';
+  activeTab: 'company' | 'profile' | 'users' = 'company';
   companyData: Partial<Company> = {};
   currentUser = this.authService.currentUser;
   companyLoading = signal(false);
   companyError = signal('');
   companySuccess = signal('');
+  passwordLoading = signal(false);
+  passwordError = signal('');
+  passwordSuccess = signal('');
+  showPasswordForm = signal(true);
+  passwordForm = {
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  };
+  isAdmin = computed(() => {
+    const role = this.currentUser()?.role;
+    return role === 'owner' || role === 'admin';
+  });
 
   constructor(
     private companyService: CompanyService,
-    private authService: AuthService
+    private authService: AuthService,
+    private userService: UserService
   ) {}
 
   async ngOnInit() {
@@ -333,5 +421,27 @@ export class SettingsComponent implements OnInit {
   formatDate(date?: Date): string {
     if (!date) return '';
     return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(date);
+  }
+
+  async changeMyPassword() {
+    if (!this.passwordForm.newPassword || this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
+      this.passwordError.set('Les mots de passe ne correspondent pas');
+      return;
+    }
+    this.passwordLoading.set(true);
+    this.passwordError.set('');
+    this.passwordSuccess.set('');
+    try {
+      await this.userService.changeMyPassword({
+        password: this.passwordForm.newPassword,
+        currentPassword: this.passwordForm.currentPassword || undefined
+      });
+      this.passwordSuccess.set('Mot de passe mis à jour');
+      this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+    } catch (error) {
+      this.passwordError.set('Impossible de changer le mot de passe');
+    } finally {
+      this.passwordLoading.set(false);
+    }
   }
 }

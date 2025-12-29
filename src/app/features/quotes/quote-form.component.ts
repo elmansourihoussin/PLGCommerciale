@@ -67,19 +67,6 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Taux TVA (%)</label>
-              <input
-                type="number"
-                [(ngModel)]="formData.taxRate"
-                name="taxRate"
-                (ngModelChange)="calculateTotals()"
-                class="input"
-                min="0"
-                max="100"
-              />
-            </div>
-
-            <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
               <select [(ngModel)]="formData.status" name="status" class="input">
                 <option value="draft">Brouillon</option>
@@ -116,14 +103,14 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
                       placeholder="Description du service/produit"
                     />
                   </div>
-                  <div class="md:col-span-2">
+                  <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
                     <input
                       type="number"
                       [(ngModel)]="line.quantity"
                       [name]="'quantity_' + i"
                       (ngModelChange)="updateLineTotal(line)"
-                      class="input"
+                      class="input w-20"
                       min="1"
                     />
                   </div>
@@ -136,6 +123,18 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
                       (ngModelChange)="updateLineTotal(line)"
                       class="input"
                       min="0"
+                    />
+                  </div>
+                  <div class="md:col-span-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">TVA (%)</label>
+                    <input
+                      type="number"
+                      [(ngModel)]="line.taxRate"
+                      [name]="'taxRate_' + i"
+                      (ngModelChange)="calculateTotals()"
+                      class="input w-20"
+                      min="0"
+                      max="100"
                     />
                   </div>
                   <div class="md:col-span-2">
@@ -171,7 +170,7 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
                   <span class="font-medium">{{ totals().subtotal.toLocaleString() }} MAD</span>
                 </div>
                 <div class="flex justify-between text-sm">
-                  <span class="text-gray-600">TVA ({{ formData.taxRate }}%):</span>
+                  <span class="text-gray-600">TVA (par ligne):</span>
                   <span class="font-medium">{{ totals().taxAmount.toLocaleString() }} MAD</span>
                 </div>
                 <div class="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
@@ -216,7 +215,6 @@ export class QuoteFormComponent implements OnInit {
     date: new Date().toISOString().split('T')[0],
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     lines: [],
-    taxRate: 20,
     status: 'draft',
     notes: ''
   };
@@ -234,26 +232,25 @@ export class QuoteFormComponent implements OnInit {
     private router: Router
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
+    await this.loadClients();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
-      this.loadQuote(id);
+      await this.loadQuote(id);
     } else {
       this.addLine();
     }
   }
 
-  loadQuote(id: string) {
-    const quote = this.quoteService.getById(id);
-    if (quote) {
-      this.formData = {
-        ...quote,
-        date: new Date(quote.date).toISOString().split('T')[0],
-        validUntil: new Date(quote.validUntil).toISOString().split('T')[0]
-      };
-      this.calculateTotals();
-    }
+  async loadQuote(id: string) {
+    const quote = await this.quoteService.getById(id);
+    this.formData = {
+      ...quote,
+      date: new Date(quote.date).toISOString().split('T')[0],
+      validUntil: new Date(quote.validUntil).toISOString().split('T')[0]
+    };
+    this.calculateTotals();
   }
 
   addLine() {
@@ -262,7 +259,8 @@ export class QuoteFormComponent implements OnInit {
       description: '',
       quantity: 1,
       unitPrice: 0,
-      total: 0
+      total: 0,
+      taxRate: undefined
     });
   }
 
@@ -278,7 +276,10 @@ export class QuoteFormComponent implements OnInit {
 
   calculateTotals() {
     const subtotal = this.formData.lines.reduce((sum: number, line: QuoteLine) => sum + line.total, 0);
-    const taxAmount = subtotal * (this.formData.taxRate / 100);
+    const taxAmount = this.formData.lines.reduce((sum: number, line: QuoteLine) => {
+      const lineTaxRate = line.taxRate ?? 0;
+      return sum + (line.total * (lineTaxRate / 100));
+    }, 0);
     const total = subtotal + taxAmount;
 
     this.totals.set({
@@ -294,26 +295,25 @@ export class QuoteFormComponent implements OnInit {
       return;
     }
 
-    const client = await this.clientService.getById(this.formData.clientId);
     const quoteData = {
       clientId: this.formData.clientId,
-      clientName: client?.name,
       title: this.formData.title,
-      date: new Date(this.formData.date),
-      validUntil: new Date(this.formData.validUntil),
-      lines: this.formData.lines,
-      subtotal: this.totals().subtotal,
-      taxRate: this.formData.taxRate,
-      taxAmount: this.totals().taxAmount,
-      total: this.totals().total,
+      date: new Date(this.formData.date).toISOString().split('T')[0],
+      validUntil: new Date(this.formData.validUntil).toISOString().split('T')[0],
       status: this.formData.status,
-      notes: this.formData.notes
+      note: this.formData.notes,
+      items: this.formData.lines.map((line: QuoteLine) => ({
+        label: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: this.normalizeLineTaxRate(line.taxRate)
+      }))
     };
 
     if (this.isEdit()) {
-      this.quoteService.update(this.route.snapshot.paramMap.get('id')!, quoteData);
+      await this.quoteService.update(this.route.snapshot.paramMap.get('id')!, quoteData);
     } else {
-      this.quoteService.create(quoteData as any);
+      await this.quoteService.create(quoteData as any);
     }
 
     this.router.navigate(['/quotes']);
@@ -321,5 +321,19 @@ export class QuoteFormComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/quotes']);
+  }
+
+  private async loadClients() {
+    await this.clientService.list();
+  }
+
+  private normalizeLineTaxRate(value?: number): number | undefined {
+    if (value === undefined || value === null || value === ('' as any)) {
+      return undefined;
+    }
+    if (value > 1) {
+      return value / 100;
+    }
+    return value;
   }
 }

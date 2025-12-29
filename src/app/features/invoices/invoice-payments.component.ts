@@ -8,7 +8,7 @@ import { InvoicePayment, InvoiceService, PaymentCreatePayload } from '../../core
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="card space-y-4">
+    <div class="card space-y-4 mt-3">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-gray-900">Paiements</h2>
         <span class="text-sm text-gray-600">

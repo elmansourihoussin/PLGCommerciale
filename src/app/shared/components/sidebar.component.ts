@@ -1,6 +1,7 @@
-import { Component, effect, signal } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -77,28 +78,30 @@ import { CommonModule } from '@angular/common';
           </a>
 
           <div class="pt-6 mt-6 border-t border-gray-200">
-            <a routerLink="/settings" routerLinkActive="bg-primary-50 text-primary-700"
-               class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-               [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
-              <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-              @if (!isCollapsed()) {
-                <span class="font-medium">Paramètres</span>
-              }
-            </a>
+            @if (isAdmin()) {
+              <a routerLink="/settings" routerLinkActive="bg-primary-50 text-primary-700"
+                 class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                 [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
+                <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                @if (!isCollapsed()) {
+                  <span class="font-medium">Paramètres</span>
+                }
+              </a>
 
-            <a routerLink="/billing" routerLinkActive="bg-primary-50 text-primary-700"
-               class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-               [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
-              <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-              </svg>
-              @if (!isCollapsed()) {
-                <span class="font-medium">Abonnement</span>
-              }
-            </a>
+              <a routerLink="/billing" routerLinkActive="bg-primary-50 text-primary-700"
+                 class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                 [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
+                <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                @if (!isCollapsed()) {
+                  <span class="font-medium">Abonnement</span>
+                }
+              </a>
+            }
           </div>
         </nav>
       </div>
@@ -112,8 +115,13 @@ import { CommonModule } from '@angular/common';
 export class SidebarComponent {
   isOpen = signal(false);
   isCollapsed = signal(false);
+  currentUser = this.authService.currentUser;
+  isAdmin = computed(() => {
+    const role = this.currentUser()?.role;
+    return role === 'owner' || role === 'admin';
+  });
 
-  constructor() {
+  constructor(private authService: AuthService) {
     this.loadCollapsedState();
 
     effect(() => {

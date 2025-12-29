@@ -12,9 +12,9 @@ export interface CreateInvoicePayload {
   paymentMethod?: string;
   invoiceDate: string;
   dueDate: string;
-  taxRate: number;
+  defaultTaxRate?: number;
   status?: Invoice['status'];
-  items: Array<{ label: string; quantity: number; unitPrice: number }>;
+  items: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number }>;
 }
 
 export type UpdateInvoicePayload = Partial<CreateInvoicePayload>;
@@ -50,9 +50,10 @@ interface ApiInvoice {
   date?: string;
   invoiceDate?: string;
   dueDate?: string;
-  items?: Array<{ label: string; quantity: number; unitPrice: number }>;
+  items?: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number }>;
   subtotal?: number;
   taxRate?: number;
+  defaultTaxRate?: number;
   taxAmount?: number;
   total?: number;
   paidAmount?: number;
@@ -120,12 +121,13 @@ export class InvoiceService {
   ) {
   }
 
-  list(params?: { page?: number; limit?: number; search?: string; status?: string }): Promise<Invoice[]> {
+  list(params?: { page?: number; limit?: number; search?: string; status?: string; clientId?: string }): Promise<Invoice[]> {
     const url = new URL(`${this.configService.apiBaseUrl}/api/invoices`);
     if (params?.page) url.searchParams.set('page', String(params.page));
     if (params?.limit) url.searchParams.set('limit', String(params.limit));
     if (params?.search) url.searchParams.set('search', params.search);
     if (params?.status) url.searchParams.set('status', params.status);
+    if (params?.clientId) url.searchParams.set('clientId', params.clientId);
     return firstValueFrom(this.http.get<InvoicesListResponse | ApiInvoice[]>(url.toString(), { headers: this.authHeaders() }))
       .then((response) => {
         const { invoices, total, totalInvoicesAmount, totalPaidAmount } = this.normalizeList(response);
@@ -175,11 +177,12 @@ export class InvoiceService {
           paymentMethod: current?.paymentMethod,
           invoiceDate: current?.date?.toISOString() ?? new Date().toISOString(),
           dueDate: current?.dueDate?.toISOString() ?? new Date().toISOString(),
-          taxRate: current?.taxRate ?? 0,
+          defaultTaxRate: current?.defaultTaxRate,
           items: (current?.lines ?? []).map((line) => ({
             label: line.description,
             quantity: line.quantity,
-            unitPrice: line.unitPrice
+            unitPrice: line.unitPrice,
+            taxRate: line.taxRate
           }))
         });
         this.upsertInvoice(updated);
@@ -221,17 +224,19 @@ export class InvoiceService {
 
   private normalizeInvoice(response: InvoiceResponse | ApiInvoice, fallback?: CreateInvoicePayload): Invoice {
     const invoice = this.extractInvoice(response);
+    const rawDefaultTaxRate = invoice.defaultTaxRate ?? invoice.taxRate ?? fallback?.defaultTaxRate ?? 0;
+    const defaultTaxRate = rawDefaultTaxRate <= 1 ? rawDefaultTaxRate * 100 : rawDefaultTaxRate;
     const items = invoice.items ?? fallback?.items ?? [];
     const lines = items.map((item, index) => ({
       id: String(index + 1),
       description: item.label,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      total: item.quantity * item.unitPrice
+      total: item.quantity * item.unitPrice,
+      taxRate: item.taxRate === undefined ? undefined : (item.taxRate <= 1 ? item.taxRate * 100 : item.taxRate)
     }));
     const subtotal = invoice.subtotal ?? lines.reduce((sum, line) => sum + line.total, 0);
-    const taxRate = invoice.taxRate ?? fallback?.taxRate ?? 0;
-    const taxAmount = invoice.taxAmount ?? subtotal * taxRate;
+    const taxAmount = invoice.taxAmount ?? subtotal * (defaultTaxRate / 100);
     const total = invoice.total ?? subtotal + taxAmount;
     return {
       id: invoice.id ?? Date.now().toString(),
@@ -248,7 +253,7 @@ export class InvoiceService {
       dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
       lines,
       subtotal,
-      taxRate,
+      defaultTaxRate,
       taxAmount,
       total,
       paidAmount: invoice.paidAmount ?? 0,
