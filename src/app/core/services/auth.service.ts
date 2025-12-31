@@ -109,14 +109,14 @@ export class AuthService {
     const name = 'fullName' in user
       ? (user.fullName ?? fallback.name)
       : ('name' in user ? user.name ?? fallback.name : fallback.name);
-    const role = (user.role ?? 'user').toString().toLowerCase();
+    const role = (user.role ?? 'agent').toString().toLowerCase();
 
     return {
       id: user.id ?? '1',
       tenantId: 'tenantId' in user ? user.tenantId : undefined,
       email: user.email ?? fallback.email,
       name,
-      role: role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'user',
+      role: role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'agent',
       isActive: 'isActive' in user ? user.isActive : undefined,
       subscription: 'subscription' in user ? user.subscription : undefined,
       createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),

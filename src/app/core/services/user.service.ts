@@ -8,7 +8,7 @@ import { User } from '../models/user.model';
 export interface CreateUserPayload {
   fullName: string;
   email: string;
-  role: 'OWNER' | 'ADMIN' | 'USER';
+  role: 'OWNER' | 'ADMIN' | 'AGENT';
   password: string;
 }
 
@@ -23,8 +23,8 @@ export interface UpdateUserStatusPayload {
 }
 
 export interface UpdateMyPasswordPayload {
-  password: string;
-  currentPassword?: string;
+  currentPassword: string;
+  newPassword: string;
 }
 
 interface ApiUser {
@@ -106,12 +106,12 @@ export class UserService {
 
   private normalizeUser(response: UserResponse | ApiUser): User {
     const user = this.extractUser(response);
-    const role = (user.role ?? 'user').toString().toLowerCase();
+    const role = (user.role ?? 'agent').toString().toLowerCase();
     return {
       id: user.id ?? '',
       email: user.email ?? '',
       name: user.fullName ?? '',
-      role: role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'user',
+      role: role === 'owner' ? 'owner' : role === 'admin' ? 'admin' : 'agent',
       isActive: user.isActive ?? true,
       createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),
       updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined

@@ -111,6 +111,23 @@ export const routes: Routes = [
         ]
       },
       {
+        path: 'articles',
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/articles/article-list.component').then(m => m.ArticleListComponent)
+          },
+          {
+            path: 'new',
+            loadComponent: () => import('./features/articles/article-form.component').then(m => m.ArticleFormComponent)
+          },
+          {
+            path: ':id/edit',
+            loadComponent: () => import('./features/articles/article-form.component').then(m => m.ArticleFormComponent)
+          }
+        ]
+      },
+      {
         path: 'users',
         canActivate: [adminGuard],
         children: [

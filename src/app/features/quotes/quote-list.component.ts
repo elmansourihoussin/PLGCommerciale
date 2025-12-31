@@ -4,11 +4,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { QuoteService } from '../../core/services/quote.service';
 import { Quote } from '../../core/models/quote.model';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-quote-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -136,6 +137,15 @@ import { Quote } from '../../core/models/quote.model';
           </div>
         </div>
       </div>
+
+      <app-confirm-dialog
+        [open]="showDeleteModal()"
+        title="Supprimer le devis"
+        message="Cette action est définitive."
+        [busy]="loading()"
+        (cancel)="closeDeleteModal()"
+        (confirm)="confirmDelete()"
+      />
     </div>
   `
 })
@@ -146,6 +156,8 @@ export class QuoteListComponent implements OnInit {
   error = signal('');
   page = signal(1);
   pageSize = signal(10);
+  showDeleteModal = signal(false);
+  pendingDeleteId = signal<string | null>(null);
 
   constructor(private quoteService: QuoteService) {}
 
@@ -172,11 +184,24 @@ export class QuoteListComponent implements OnInit {
   }
 
   deleteQuote(id: string) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce devis ?')) {
-      this.quoteService.delete(id).catch(() => {
-        this.error.set('Impossible de supprimer le devis');
-      });
-    }
+    this.pendingDeleteId.set(id);
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal.set(false);
+    this.pendingDeleteId.set(null);
+  }
+
+  confirmDelete() {
+    const id = this.pendingDeleteId();
+    if (!id) return;
+    this.quoteService.delete(id).then(() => {
+      this.closeDeleteModal();
+      this.loadQuotes();
+    }).catch(() => {
+      this.error.set('Impossible de supprimer le devis');
+    });
   }
 
   getStatusBadgeClass(status: string): string {

@@ -66,6 +66,17 @@ import { AuthService } from '../../core/services/auth.service';
             }
           </a>
 
+          <a routerLink="/checks" routerLinkActive="bg-primary-50 text-primary-700"
+             class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+             [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
+            <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m-6 4h10M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+            </svg>
+            @if (!isCollapsed()) {
+              <span class="font-medium">Chèques</span>
+            }
+          </a>
+
           <a routerLink="/clients" routerLinkActive="bg-primary-50 text-primary-700"
              class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
              [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
@@ -74,6 +85,17 @@ import { AuthService } from '../../core/services/auth.service';
             </svg>
             @if (!isCollapsed()) {
               <span class="font-medium">Clients</span>
+            }
+          </a>
+
+          <a routerLink="/articles" routerLinkActive="bg-primary-50 text-primary-700"
+             class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+             [class.justify-center]="isCollapsed()" [class.gap-3]="!isCollapsed()">
+            <svg class="w-5 h-5" [class.mr-3]="!isCollapsed()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V7a2 2 0 00-2-2h-4.5m-2 0H6a2 2 0 00-2 2v6m16 0v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4m16 0H4m4-8h4m-4 4h8"/>
+            </svg>
+            @if (!isCollapsed()) {
+              <span class="font-medium">Articles</span>
             }
           </a>
 

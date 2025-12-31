@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AuthService } from '../../core/services/auth.service';
+import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../core/services/billing.service';
 
 @Component({
   selector: 'app-billing',
@@ -9,6 +9,12 @@ import { AuthService } from '../../core/services/auth.service';
   template: `
     <div class="space-y-6">
       <h1 class="text-2xl font-bold text-gray-900">Abonnement & Facturation</h1>
+
+      @if (error()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ error() }}
+        </div>
+      }
 
       <div class="card bg-gradient-to-r from-primary-500 to-primary-600 text-white">
         <div class="flex items-center justify-between">
@@ -51,8 +57,8 @@ import { AuthService } from '../../core/services/auth.service';
                 10 clients max
               </li>
             </ul>
-            <button class="btn-outline w-full" [disabled]="currentPlan() === 'free'">
-              {{ currentPlan() === 'free' ? 'Plan actuel' : 'Choisir' }}
+            <button class="btn-outline w-full" [disabled]="currentPlan() === 'FREE' || loading()" (click)="openPlanModal('FREE')">
+              {{ currentPlan() === 'FREE' ? 'Plan actuel' : 'Choisir' }}
             </button>
           </div>
         </div>
@@ -98,8 +104,8 @@ import { AuthService } from '../../core/services/auth.service';
                 Support prioritaire
               </li>
             </ul>
-            <button class="btn-primary w-full" [disabled]="currentPlan() === 'pro'">
-              {{ currentPlan() === 'pro' ? 'Plan actuel' : 'Upgrade' }}
+            <button class="btn-primary w-full" [disabled]="currentPlan() === 'PRO' || loading()" (click)="openPlanModal('PRO')">
+              {{ currentPlan() === 'PRO' ? 'Plan actuel' : 'Upgrade' }}
             </button>
           </div>
         </div>
@@ -140,97 +146,246 @@ import { AuthService } from '../../core/services/auth.service';
                 Formation incluse
               </li>
             </ul>
-            <button class="btn-outline w-full">
-              Nous contacter
+            <button class="btn-outline w-full" [disabled]="currentPlan() === 'ENTERPRISE' || loading()" (click)="openPlanModal('ENTERPRISE')">
+              {{ currentPlan() === 'ENTERPRISE' ? 'Plan actuel' : 'Nous contacter' }}
             </button>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Historique de facturation</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Historique d’abonnement</h2>
+
+        @if (historyError()) {
+          <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+            {{ historyError() }}
+          </div>
+        }
+
         <div class="table-wrapper">
           <table class="table">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Description</th>
-                <th>Montant</th>
+                <th>Plan</th>
                 <th>Statut</th>
-                <th>Actions</th>
+                <th>Action</th>
+                <th>Note</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr>
-                <td>01/11/2025</td>
-                <td>Plan Pro - Novembre 2025</td>
-                <td class="font-semibold">199 MAD</td>
-                <td><span class="badge-success">Payé</span></td>
-                <td>
-                  <button class="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                    Télécharger
-                  </button>
-                </td>
-              </tr>
-              <tr>
-                <td>01/10/2025</td>
-                <td>Plan Pro - Octobre 2025</td>
-                <td class="font-semibold">199 MAD</td>
-                <td><span class="badge-success">Payé</span></td>
-                <td>
-                  <button class="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                    Télécharger
-                  </button>
-                </td>
-              </tr>
+              @if (historyLoading()) {
+                <tr>
+                  <td colspan="5" class="text-center text-gray-500 py-8">Chargement...</td>
+                </tr>
+              } @else {
+                @for (entry of history(); track entry.id) {
+                  <tr>
+                    <td>{{ formatDate(entry.createdAt) }}</td>
+                    <td class="font-medium">{{ getPlanLabel(entry.plan) }}</td>
+                    <td>{{ getStatusLabel(entry.status) }}</td>
+                    <td>{{ entry.action || '—' }}</td>
+                    <td>{{ entry.note || '—' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="text-center text-gray-500 py-8">Aucun historique</td>
+                  </tr>
+                }
+              }
             </tbody>
           </table>
         </div>
+
+        <div class="flex items-center justify-between pt-4">
+          <p class="text-sm text-gray-600">
+            Page {{ historyPage() }} sur {{ historyTotalPages() }}
+          </p>
+          <div class="flex items-center space-x-2">
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="historyPage() <= 1 || historyLoading()"
+              (click)="goToHistoryPage(historyPage() - 1)"
+            >
+              Précédent
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="historyPage() >= historyTotalPages() || historyLoading()"
+              (click)="goToHistoryPage(historyPage() + 1)"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
       </div>
+
+      @if (showPlanModal()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50"></div>
+          <div class="relative bg-white rounded-lg shadow-lg w-full max-w-md mx-4 p-6">
+            <h3 class="text-lg font-semibold text-gray-900">
+              Passer au plan {{ getPlanLabel(selectedPlan()) }} ?
+            </h3>
+            <p class="text-sm text-gray-600 mt-2">
+              Confirmez-vous ce changement d’abonnement ?
+            </p>
+            <div class="mt-6 flex justify-end gap-3">
+              <button type="button" class="btn-secondary" (click)="closePlanModal()">
+                Annuler
+              </button>
+              <button type="button" class="btn-primary" [disabled]="loading()" (click)="confirmPlanChange()">
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
-export class BillingComponent {
-  currentUser = this.authService.currentUser;
+export class BillingComponent implements OnInit {
+  subscription = signal<Subscription>({ plan: 'FREE', status: 'INACTIVE' });
+  loading = signal(false);
+  error = signal('');
+  history = signal<SubscriptionHistoryEntry[]>([]);
+  historyLoading = signal(false);
+  historyError = signal('');
+  historyPage = signal(1);
+  historyPageSize = signal(10);
+  historyTotalPages = signal(1);
+  showPlanModal = signal(false);
+  selectedPlan = signal<Subscription['plan']>('FREE');
 
-  constructor(private authService: AuthService) {}
+  constructor(private billingService: BillingService) {}
 
-  currentPlan(): string {
-    return this.currentUser()?.subscription?.plan || 'free';
+  async ngOnInit() {
+    await Promise.all([this.loadSubscription(), this.loadHistory()]);
+  }
+
+  async loadSubscription() {
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      const subscription = await this.billingService.getSubscription();
+      this.subscription.set(subscription);
+    } catch {
+      this.error.set('Impossible de charger l’abonnement');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async changePlan(plan: Subscription['plan']) {
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      const subscription = await this.billingService.updateSubscription({
+        plan,
+        status: 'ACTIVE'
+      });
+      this.subscription.set(subscription);
+      await this.loadHistory();
+    } catch {
+      this.error.set('Impossible de modifier l’abonnement');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  currentPlan(): Subscription['plan'] {
+    return this.subscription().plan;
   }
 
   getPlanName(): string {
     const plans: Record<string, string> = {
-      free: 'Gratuit',
-      starter: 'Starter',
-      pro: 'Pro',
-      enterprise: 'Entreprise'
+      FREE: 'Gratuit',
+      STARTER: 'Starter',
+      PRO: 'Pro',
+      ENTERPRISE: 'Entreprise'
     };
-    return plans[this.currentPlan()] || 'Gratuit';
+    return plans[this.currentPlan()] ?? 'Gratuit';
   }
 
   getPlanPrice(): string {
     const prices: Record<string, string> = {
-      free: '0 MAD',
-      starter: '99 MAD',
-      pro: '199 MAD',
-      enterprise: 'Sur mesure'
+      FREE: '0 MAD',
+      STARTER: '99 MAD',
+      PRO: '199 MAD',
+      ENTERPRISE: 'Sur mesure'
     };
-    return prices[this.currentPlan()] || '0 MAD';
+    return prices[this.currentPlan()] ?? '0 MAD';
   }
 
   getSubscriptionStatus(): string {
-    const subscription = this.currentUser()?.subscription;
-    if (!subscription) return 'Pas d\'abonnement actif';
-
-    if (subscription.status === 'active') {
-      if (subscription.expiresAt) {
-        const expiresDate = new Date(subscription.expiresAt);
-        return `Actif jusqu'au ${new Intl.DateTimeFormat('fr-FR').format(expiresDate)}`;
-      }
-      return 'Abonnement actif';
-    }
-
+    const status = this.subscription().status;
+    if (status === 'ACTIVE') return 'Abonnement actif';
+    if (status === 'CANCELLED') return 'Abonnement annulé';
     return 'Abonnement inactif';
+  }
+
+  openPlanModal(plan: Subscription['plan']) {
+    this.selectedPlan.set(plan);
+    this.showPlanModal.set(true);
+  }
+
+  closePlanModal() {
+    this.showPlanModal.set(false);
+  }
+
+  async confirmPlanChange() {
+    const plan = this.selectedPlan();
+    this.closePlanModal();
+    await this.changePlan(plan);
+  }
+
+  async loadHistory() {
+    this.historyLoading.set(true);
+    this.historyError.set('');
+    try {
+      const response = await this.billingService.getHistory({
+        page: this.historyPage(),
+        limit: this.historyPageSize()
+      });
+      this.history.set(response.entries);
+      this.historyTotalPages.set(response.meta?.totalPages ?? 1);
+    } catch {
+      this.historyError.set('Impossible de charger l’historique');
+    } finally {
+      this.historyLoading.set(false);
+    }
+  }
+
+  async goToHistoryPage(page: number) {
+    if (page < 1 || page > this.historyTotalPages()) return;
+    this.historyPage.set(page);
+    await this.loadHistory();
+  }
+
+  formatDate(date?: Date): string {
+    if (!date) return '—';
+    return new Intl.DateTimeFormat('fr-FR').format(date);
+  }
+
+  getPlanLabel(plan: Subscription['plan']): string {
+    return this.getPlanNameFromValue(plan);
+  }
+
+  getStatusLabel(status: Subscription['status']): string {
+    if (status === 'ACTIVE') return 'Actif';
+    if (status === 'CANCELLED') return 'Annulé';
+    return 'Inactif';
+  }
+
+  private getPlanNameFromValue(plan: Subscription['plan']): string {
+    const plans: Record<Subscription['plan'], string> = {
+      FREE: 'Gratuit',
+      STARTER: 'Starter',
+      PRO: 'Pro',
+      ENTERPRISE: 'Entreprise'
+    };
+    return plans[plan] ?? 'Gratuit';
   }
 }

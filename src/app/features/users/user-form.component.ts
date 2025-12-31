@@ -41,7 +41,7 @@ import { User } from '../../core/models/user.model';
               <select [(ngModel)]="formData.role" name="role" class="input" required>
                 <option value="OWNER">Super administrateur</option>
                 <option value="ADMIN">Administrateur</option>
-                <option value="USER">Gestionnaire</option>
+                <option value="AGENT">Gestionnaire</option>
               </select>
             </div>
             @if (!isEdit()) {
@@ -75,7 +75,7 @@ export class UserFormComponent implements OnInit {
   formData: CreateUserPayload = {
     fullName: '',
     email: '',
-    role: 'USER',
+    role: 'AGENT',
     password: ''
   };
 
@@ -146,7 +146,7 @@ export class UserFormComponent implements OnInit {
   mapRoleToApi(role: User['role']): CreateUserPayload['role'] {
     if (role === 'owner') return 'OWNER';
     if (role === 'admin') return 'ADMIN';
-    return 'USER';
+    return 'AGENT';
   }
 
   goBack() {

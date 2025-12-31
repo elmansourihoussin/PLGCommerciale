@@ -5,6 +5,7 @@ export interface InvoiceLine {
   unitPrice: number;
   total: number;
   taxRate?: number;
+  articleId?: string;
 }
 
 export interface Invoice {

@@ -12,7 +12,7 @@ export interface CreateQuotePayload {
   date: string;
   validUntil: string;
   status?: Quote['status'];
-  items: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number }>;
+  items: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number; articleId?: string }>;
 }
 
 export type UpdateQuotePayload = Partial<CreateQuotePayload>;
@@ -29,7 +29,7 @@ interface ApiQuote {
   title?: string;
   date?: string;
   validUntil?: string;
-  items?: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number }>;
+  items?: Array<{ label: string; quantity: number; unitPrice: number; taxRate?: number; articleId?: string }>;
   subtotal?: number;
   taxAmount?: number;
   total?: number;
@@ -142,7 +142,8 @@ export class QuoteService {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       total: item.quantity * item.unitPrice,
-      taxRate: item.taxRate === undefined ? undefined : (item.taxRate <= 1 ? item.taxRate * 100 : item.taxRate)
+      taxRate: item.taxRate === undefined ? undefined : (item.taxRate <= 1 ? item.taxRate * 100 : item.taxRate),
+      articleId: item.articleId
     }));
     const subtotal = quote.subtotal ?? lines.reduce((sum, line) => sum + line.total, 0);
     const taxAmount = quote.taxAmount ?? lines.reduce((sum, line) => {

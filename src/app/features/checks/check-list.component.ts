@@ -1,13 +1,16 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CheckService } from '../../core/services/check.service';
+import { ClientService } from '../../core/services/client.service';
+import { CheckStatus } from '../../core/models/check.model';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-check-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -20,49 +23,65 @@ import { CheckService } from '../../core/services/check.service';
         </a>
       </div>
 
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="card">
+          <p class="text-sm text-gray-600">En attente</p>
+          <p class="mt-2 text-2xl font-bold text-orange-600">{{ statusCounts().PENDING }}</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Encaissés</p>
+          <p class="mt-2 text-2xl font-bold text-green-600">{{ statusCounts().CASHED }}</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Annulés</p>
+          <p class="mt-2 text-2xl font-bold text-red-600">{{ statusCounts().CANCELLED }}</p>
+        </div>
+      </div>
+
       <div class="card">
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
-          <div class="flex-1">
-            <input
-              type="text"
-              [(ngModel)]="searchTerm"
-              (ngModelChange)="onSearchChange()"
-              placeholder="Rechercher par bénéficiaire ou numéro..."
-              class="input"
-            />
-          </div>
           <select [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()" class="input sm:w-48">
             <option value="">Tous les statuts</option>
-            <option value="pending">En attente</option>
-            <option value="printed">Imprimé</option>
-            <option value="cashed">Encaissé</option>
-            <option value="cancelled">Annulé</option>
+            <option value="PENDING">En attente</option>
+            <option value="CASHED">Encaissé</option>
+            <option value="CANCELLED">Annulé</option>
+          </select>
+          <select [(ngModel)]="filterClientId" (ngModelChange)="onFilterChange()" class="input sm:w-64">
+            <option value="">Tous les clients</option>
+            @for (client of clients(); track client.id) {
+              <option [value]="client.id">{{ client.name }}</option>
+            }
           </select>
         </div>
+
+        @if (error()) {
+          <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+            {{ error() }}
+          </div>
+        }
 
         <div class="table-wrapper">
           <table class="table">
             <thead>
               <tr>
-                <th>N° Chèque</th>
-                <th>Bénéficiaire</th>
                 <th>Client</th>
-                <th>Date</th>
+                <th>Échéance</th>
                 <th>Montant</th>
-                <th>Banque</th>
                 <th>Statut</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              @for (check of filteredChecks(); track check.id) {
+              @if (loading()) {
+                <tr>
+                  <td colspan="5" class="text-center text-gray-500 py-8">Chargement...</td>
+                </tr>
+              } @else {
+                @for (check of checks(); track check.id) {
                 <tr class="hover:bg-gray-50">
-                  <td class="font-medium">{{ check.number }}</td>
-                  <td>{{ check.beneficiary }}</td>
-                  <td>{{ check.clientName }}</td>
-                  <td>{{ formatDate(check.date) }}</td>
+                  <td>{{ getClientName(check.clientId, check.clientName) }}</td>
+                  <td>{{ formatDate(check.dueDate) }}</td>
                   <td class="font-semibold">{{ check.amount.toLocaleString() }} MAD</td>
-                  <td>{{ check.bankName || '-' }}</td>
                   <td>
                     <span [class]="getStatusBadgeClass(check.status)">
                       {{ getStatusLabel(check.status) }}
@@ -70,15 +89,6 @@ import { CheckService } from '../../core/services/check.service';
                   </td>
                   <td>
                     <div class="flex items-center space-x-3">
-                      <button
-                        (click)="printCheck(check.id)"
-                        class="text-primary-600 hover:text-primary-700"
-                        title="Imprimer"
-                      >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                        </svg>
-                      </button>
                       <a [routerLink]="['/checks', check.id, 'edit']" class="text-gray-600 hover:text-gray-900">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -93,85 +103,185 @@ import { CheckService } from '../../core/services/check.service';
                   </td>
                 </tr>
               } @empty {
-                <tr>
-                  <td colspan="8" class="text-center text-gray-500 py-8">
-                    Aucun chèque trouvé
-                  </td>
-                </tr>
+                  <tr>
+                    <td colspan="5" class="text-center text-gray-500 py-8">
+                      Aucun chèque trouvé
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
         </div>
+
+        <div class="flex items-center justify-between pt-4">
+          <p class="text-sm text-gray-600">
+            Page {{ page() }} sur {{ totalPages() }}
+          </p>
+          <div class="flex items-center space-x-2">
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="page() <= 1 || loading()"
+              (click)="goToPage(page() - 1)"
+            >
+              Précédent
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="page() >= totalPages() || loading()"
+              (click)="goToPage(page() + 1)"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
       </div>
+
+      <app-confirm-dialog
+        [open]="showDeleteModal()"
+        title="Supprimer le chèque"
+        message="Cette action est définitive."
+        [busy]="loading()"
+        (cancel)="closeDeleteModal()"
+        (confirm)="confirmDelete()"
+      />
     </div>
   `
 })
-export class CheckListComponent {
-  searchTerm = signal('');
-  filterStatus = signal('');
-
-  constructor(private checkService: CheckService) {}
-
-  filteredChecks = computed(() => {
-    let checks = this.checkService.checks();
-
-    const search = this.searchTerm().toLowerCase();
-    if (search) {
-      checks = checks.filter(c =>
-        c.number.toLowerCase().includes(search) ||
-        c.beneficiary.toLowerCase().includes(search) ||
-        c.clientName?.toLowerCase().includes(search)
-      );
-    }
-
-    const status = this.filterStatus();
-    if (status) {
-      checks = checks.filter(c => c.status === status);
-    }
-
-    return checks.sort((a, b) => b.date.getTime() - a.date.getTime());
+export class CheckListComponent implements OnInit {
+  checks = this.checkService.checks;
+  clients = this.clientService.clients;
+  loading = signal(false);
+  error = signal('');
+  filterStatus = signal<CheckStatus | ''>('');
+  filterClientId = signal('');
+  page = signal(1);
+  pageSize = signal(10);
+  showDeleteModal = signal(false);
+  pendingDeleteId = signal<string | null>(null);
+  statusCounts = signal<Record<CheckStatus, number>>({
+    PENDING: 0,
+    CASHED: 0,
+    CANCELLED: 0
   });
 
-  onSearchChange() {
-    this.searchTerm.set(this.searchTerm());
+  constructor(
+    private checkService: CheckService,
+    private clientService: ClientService
+  ) {}
+
+  async ngOnInit() {
+    await Promise.all([
+      this.clientService.list(),
+      this.loadChecks(),
+      this.loadStatusCounts()
+    ]);
+  }
+
+  async loadChecks() {
+    this.loading.set(true);
+    this.error.set('');
+    try {
+      await this.checkService.list({
+        status: this.filterStatus() || undefined,
+        clientId: this.filterClientId() || undefined,
+        page: this.page(),
+        limit: this.pageSize()
+      });
+    } catch {
+      this.error.set('Impossible de charger les chèques');
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   onFilterChange() {
-    this.filterStatus.set(this.filterStatus());
+    this.page.set(1);
+    this.loadChecks();
+    this.loadStatusCounts();
   }
 
-  printCheck(id: string) {
-    const check = this.checkService.getById(id);
-    if (check) {
-      alert(`Impression du chèque ${check.number} pour ${check.amount} MAD`);
-      this.checkService.update(id, { status: 'printed' });
-    }
+  async goToPage(page: number) {
+    if (page < 1) return;
+    this.page.set(page);
+    await this.loadChecks();
   }
 
   deleteCheck(id: string) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce chèque ?')) {
-      this.checkService.delete(id);
+    this.pendingDeleteId.set(id);
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal.set(false);
+    this.pendingDeleteId.set(null);
+  }
+
+  confirmDelete() {
+    const id = this.pendingDeleteId();
+    if (!id) return;
+    this.checkService.delete(id).then(() => {
+      this.closeDeleteModal();
+      this.loadChecks();
+      this.loadStatusCounts();
+    }).catch(() => {
+      this.error.set('Impossible de supprimer le chèque');
+    });
+  }
+
+  totalPages = computed(() => {
+    const total = this.checkService.totalCount();
+    const size = this.pageSize();
+    if (!total || size <= 0) return 1;
+    return Math.max(1, Math.ceil(total / size));
+  });
+
+  async loadStatusCounts() {
+    const clientId = this.filterClientId() || undefined;
+    try {
+      const [pending, cashed, cancelled] = await Promise.all([
+        this.checkService.fetchCount({ status: 'PENDING', clientId }),
+        this.checkService.fetchCount({ status: 'CASHED', clientId }),
+        this.checkService.fetchCount({ status: 'CANCELLED', clientId })
+      ]);
+      this.statusCounts.set({
+        PENDING: pending,
+        CASHED: cashed,
+        CANCELLED: cancelled
+      });
+    } catch {
+      this.statusCounts.set({
+        PENDING: 0,
+        CASHED: 0,
+        CANCELLED: 0
+      });
     }
   }
 
-  getStatusBadgeClass(status: string): string {
+  getStatusBadgeClass(status: CheckStatus | string): string {
     const classes: Record<string, string> = {
-      pending: 'badge-warning',
-      printed: 'badge-info',
-      cashed: 'badge-success',
-      cancelled: 'badge-danger'
+      PENDING: 'badge-warning',
+      CASHED: 'badge-success',
+      CANCELLED: 'badge-danger'
     };
     return classes[status] || 'badge-info';
   }
 
-  getStatusLabel(status: string): string {
+  getStatusLabel(status: CheckStatus | string): string {
     const labels: Record<string, string> = {
-      pending: 'En attente',
-      printed: 'Imprimé',
-      cashed: 'Encaissé',
-      cancelled: 'Annulé'
+      PENDING: 'En attente',
+      CASHED: 'Encaissé',
+      CANCELLED: 'Annulé'
     };
     return labels[status] || status;
+  }
+
+  getClientName(clientId: string, fallback?: string): string {
+    if (fallback) return fallback;
+    const client = this.clients().find(c => c.id === clientId);
+    return client?.name ?? '—';
   }
 
   formatDate(date: Date): string {

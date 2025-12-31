@@ -3,11 +3,12 @@ import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ClientService } from '../../core/services/client.service';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-client-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -114,6 +115,15 @@ import { ClientService } from '../../core/services/client.service';
           }
         </div>
       </div>
+
+      <app-confirm-dialog
+        [open]="showDeleteModal()"
+        title="Supprimer le client"
+        message="Cette action est définitive."
+        [busy]="loading()"
+        (cancel)="closeDeleteModal()"
+        (confirm)="confirmDelete()"
+      />
     </div>
   `
 })
@@ -121,6 +131,8 @@ export class ClientListComponent implements OnInit {
   searchTerm = signal('');
   loading = signal(false);
   error = signal('');
+  showDeleteModal = signal(false);
+  pendingDeleteId = signal<string | null>(null);
 
   constructor(private clientService: ClientService) {}
 
@@ -155,13 +167,25 @@ export class ClientListComponent implements OnInit {
     this.searchTerm.set(this.searchTerm());
   }
 
-  async deleteClient(id: string) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      try {
-        await this.clientService.delete(id);
-      } catch (err) {
-        this.error.set('Impossible de supprimer le client');
-      }
+  deleteClient(id: string) {
+    this.pendingDeleteId.set(id);
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal.set(false);
+    this.pendingDeleteId.set(null);
+  }
+
+  async confirmDelete() {
+    const id = this.pendingDeleteId();
+    if (!id) return;
+    try {
+      await this.clientService.delete(id);
+      this.closeDeleteModal();
+      await this.clientService.list();
+    } catch (err) {
+      this.error.set('Impossible de supprimer le client');
     }
   }
 

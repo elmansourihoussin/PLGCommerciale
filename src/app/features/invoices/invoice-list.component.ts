@@ -3,11 +3,12 @@ import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InvoiceService } from '../../core/services/invoice.service';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -167,6 +168,15 @@ import { InvoiceService } from '../../core/services/invoice.service';
           </div>
         </div>
       </div>
+
+      <app-confirm-dialog
+        [open]="showDeleteModal()"
+        title="Supprimer la facture"
+        message="Cette action est définitive."
+        [busy]="loading()"
+        (cancel)="closeDeleteModal()"
+        (confirm)="confirmDelete()"
+      />
     </div>
   `
 })
@@ -177,6 +187,8 @@ export class InvoiceListComponent implements OnInit {
   error = signal('');
   page = signal(1);
   pageSize = signal(10);
+  showDeleteModal = signal(false);
+  pendingDeleteId = signal<string | null>(null);
 
   constructor(private invoiceService: InvoiceService) {}
 
@@ -242,11 +254,24 @@ export class InvoiceListComponent implements OnInit {
   }
 
   deleteInvoice(id: string) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
-      this.invoiceService.delete(id).catch(() => {
-        this.error.set('Impossible de supprimer la facture');
-      });
-    }
+    this.pendingDeleteId.set(id);
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal() {
+    this.showDeleteModal.set(false);
+    this.pendingDeleteId.set(null);
+  }
+
+  confirmDelete() {
+    const id = this.pendingDeleteId();
+    if (!id) return;
+    this.invoiceService.delete(id).then(() => {
+      this.closeDeleteModal();
+      this.loadInvoices();
+    }).catch(() => {
+      this.error.set('Impossible de supprimer la facture');
+    });
   }
 
   getStatusBadgeClass(status: string): string {

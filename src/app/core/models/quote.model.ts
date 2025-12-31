@@ -5,6 +5,7 @@ export interface QuoteLine {
   unitPrice: number;
   total: number;
   taxRate?: number;
+  articleId?: string;
 }
 
 export interface Quote {

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InvoiceService } from '../../core/services/invoice.service';
+import { ArticleService } from '../../core/services/article.service';
 import { ClientService } from '../../core/services/client.service';
 import { InvoiceLine } from '../../core/models/invoice.model';
 
@@ -114,6 +115,20 @@ import { InvoiceLine } from '../../core/models/invoice.model';
             @for (line of formData.lines; track line.id; let i = $index) {
               <div class="border border-gray-200 rounded-lg p-4">
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <div class="md:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Article</label>
+                    <select
+                      [(ngModel)]="line.articleId"
+                      [name]="'article_' + i"
+                      (ngModelChange)="applyArticle(line)"
+                      class="input"
+                    >
+                      <option value="">Libre</option>
+                      @for (article of articles(); track article.id) {
+                        <option [value]="article.id">{{ article.name }}</option>
+                      }
+                    </select>
+                  </div>
                   <div class="md:col-span-5">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <input
@@ -229,6 +244,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
 export class InvoiceFormComponent implements OnInit {
   isEdit = signal(false);
   clients = this.clientService.clients;
+  articles = this.articleService.articles;
   clientsLoading = signal(false);
   clientsError = signal('');
 
@@ -252,12 +268,16 @@ export class InvoiceFormComponent implements OnInit {
   constructor(
     private invoiceService: InvoiceService,
     private clientService: ClientService,
+    private articleService: ArticleService,
     private route: ActivatedRoute,
     private router: Router
   ) {}
 
   async ngOnInit() {
-    await this.loadClients();
+    await Promise.all([
+      this.loadClients(),
+      this.articleService.list({ page: 1, limit: 200 })
+    ]);
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
@@ -297,7 +317,8 @@ export class InvoiceFormComponent implements OnInit {
       quantity: 1,
       unitPrice: 0,
       total: 0,
-      taxRate: undefined
+      taxRate: undefined,
+      articleId: undefined
     });
   }
 
@@ -309,6 +330,16 @@ export class InvoiceFormComponent implements OnInit {
   updateLineTotal(line: InvoiceLine) {
     line.total = line.quantity * line.unitPrice;
     this.calculateTotals();
+  }
+
+  applyArticle(line: InvoiceLine) {
+    if (!line.articleId) return;
+    const article = this.articles().find(a => a.id === line.articleId);
+    if (!article) return;
+    line.description = article.name;
+    line.unitPrice = article.unitPrice;
+    line.taxRate = article.taxRate !== undefined ? article.taxRate * 100 : line.taxRate;
+    this.updateLineTotal(line);
   }
 
   calculateTotals() {
@@ -344,7 +375,8 @@ export class InvoiceFormComponent implements OnInit {
         label: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        taxRate: this.normalizeLineTaxRate(line.taxRate)
+        taxRate: this.normalizeLineTaxRate(line.taxRate),
+        articleId: line.articleId
       }))
     };
 

@@ -2,6 +2,7 @@ import { Component, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
+import { Router } from '@angular/router';
 import { UserService } from '../../core/services/user.service';
 
 @Component({
@@ -98,7 +99,8 @@ export class ProfileComponent {
 
   constructor(
     private authService: AuthService,
-    private userService: UserService
+    private userService: UserService,
+    private router: Router
   ) {}
 
   getUserInitials(): string {
@@ -121,6 +123,10 @@ export class ProfileComponent {
   }
 
   async changeMyPassword() {
+    if (!this.passwordForm.currentPassword) {
+      this.passwordError.set('Le mot de passe actuel est obligatoire');
+      return;
+    }
     if (!this.passwordForm.newPassword || this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
       this.passwordError.set('Les mots de passe ne correspondent pas');
       return;
@@ -130,11 +136,14 @@ export class ProfileComponent {
     this.passwordSuccess.set('');
     try {
       await this.userService.changeMyPassword({
-        password: this.passwordForm.newPassword,
-        currentPassword: this.passwordForm.currentPassword || undefined
+        currentPassword: this.passwordForm.currentPassword,
+        newPassword: this.passwordForm.newPassword
       });
       this.passwordSuccess.set('Mot de passe mis à jour');
       this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+      alert('Mot de passe modifié. Veuillez vous reconnecter.');
+      this.authService.logout();
+      this.router.navigate(['/auth/login']);
     } catch (error) {
       this.passwordError.set('Impossible de changer le mot de passe');
     } finally {

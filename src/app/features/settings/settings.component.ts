@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { UserListComponent } from '../users/user-list.component';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
+import { Router } from '@angular/router';
 import { UserService } from '../../core/services/user.service';
 import { Company } from '../../core/models/company.model';
 
@@ -344,7 +345,8 @@ export class SettingsComponent implements OnInit {
   constructor(
     private companyService: CompanyService,
     private authService: AuthService,
-    private userService: UserService
+    private userService: UserService,
+    private router: Router
   ) {}
 
   async ngOnInit() {
@@ -409,13 +411,13 @@ export class SettingsComponent implements OnInit {
 
   getRoleLabel(): string {
     const role = this.currentUser()?.role;
+    if (role === 'owner') {
+      return 'Super administrateur';
+    }
     if (role === 'admin') {
       return 'Administrateur';
     }
-    if (role === 'owner') {
-      return 'Propriétaire';
-    }
-    return 'Utilisateur';
+    return 'Gestionnaire';
   }
 
   formatDate(date?: Date): string {
@@ -424,6 +426,10 @@ export class SettingsComponent implements OnInit {
   }
 
   async changeMyPassword() {
+    if (!this.passwordForm.currentPassword) {
+      this.passwordError.set('Le mot de passe actuel est obligatoire');
+      return;
+    }
     if (!this.passwordForm.newPassword || this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
       this.passwordError.set('Les mots de passe ne correspondent pas');
       return;
@@ -433,11 +439,14 @@ export class SettingsComponent implements OnInit {
     this.passwordSuccess.set('');
     try {
       await this.userService.changeMyPassword({
-        password: this.passwordForm.newPassword,
-        currentPassword: this.passwordForm.currentPassword || undefined
+        currentPassword: this.passwordForm.currentPassword,
+        newPassword: this.passwordForm.newPassword
       });
       this.passwordSuccess.set('Mot de passe mis à jour');
       this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+      alert('Mot de passe modifié. Veuillez vous reconnecter.');
+      this.authService.logout();
+      this.router.navigate(['/auth/login']);
     } catch (error) {
       this.passwordError.set('Impossible de changer le mot de passe');
     } finally {
