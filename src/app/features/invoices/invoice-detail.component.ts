@@ -17,6 +17,9 @@ import { InvoicePaymentsComponent } from './invoice-payments.component';
           <p class="text-gray-600">{{ invoice()?.title }}</p>
         </div>
         <div class="flex items-center space-x-3">
+          <button class="btn-outline" (click)="downloadPdf()" [disabled]="!invoiceId()">
+            Télécharger PDF
+          </button>
           <a [routerLink]="['/invoices', invoiceId(), 'edit']" class="btn-secondary">Modifier</a>
           <button class="btn-outline" (click)="goBack()">Retour</button>
         </div>
@@ -182,5 +185,18 @@ export class InvoiceDetailComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/invoices']);
+  }
+
+  async downloadPdf() {
+    const id = this.invoiceId();
+    if (!id) return;
+    try {
+      const blob = await this.invoiceService.downloadPdf(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      this.error.set('Impossible de télécharger la facture');
+    }
   }
 }

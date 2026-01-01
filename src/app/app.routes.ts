@@ -1,8 +1,47 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
+import { platformAuthGuard } from './core/guards/platform-auth.guard';
 
 export const routes: Routes = [
+  {
+    path: 'platform',
+    children: [
+      {
+        path: 'login',
+        loadComponent: () => import('./features/platform/platform-login.component').then(m => m.PlatformLoginComponent)
+      },
+      {
+        path: '',
+        loadComponent: () => import('./features/platform/platform-layout.component').then(m => m.PlatformLayoutComponent),
+        canActivate: [platformAuthGuard],
+        children: [
+          {
+            path: 'tenants',
+            children: [
+              {
+                path: '',
+                loadComponent: () => import('./features/platform/platform-tenant-list.component').then(m => m.PlatformTenantListComponent)
+              },
+              {
+                path: 'new',
+                loadComponent: () => import('./features/platform/platform-tenant-create.component').then(m => m.PlatformTenantCreateComponent)
+              },
+              {
+                path: ':id',
+                loadComponent: () => import('./features/platform/platform-tenant-detail.component').then(m => m.PlatformTenantDetailComponent)
+              }
+            ]
+          },
+          {
+            path: '',
+            redirectTo: 'tenants',
+            pathMatch: 'full'
+          }
+        ]
+      }
+    ]
+  },
   {
     path: 'auth',
     children: [
@@ -148,6 +187,10 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+      },
+      {
+        path: 'notifications',
+        loadComponent: () => import('./features/notifications/notification-list.component').then(m => m.NotificationListComponent)
       },
       {
         path: 'settings',

@@ -2,6 +2,7 @@ import { Component, computed, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-header',
@@ -32,28 +33,39 @@ import { AuthService } from '../../core/services/auth.service';
             <div class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               <div class="px-4 pb-2 flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-800">Notifications</span>
-                <button class="text-xs text-primary-600 hover:underline" (click)="markAllRead()">Tout marquer lu</button>
+                <button class="text-xs text-primary-600 hover:underline" (click)="markAllRead()" [disabled]="notificationsLoading()">
+                  Tout marquer lu
+                </button>
               </div>
               <div class="max-h-64 overflow-y-auto">
-                @if (notifications().length === 0) {
+                @if (notificationsLoading()) {
+                  <div class="px-4 py-6 text-sm text-gray-500 text-center">Chargement...</div>
+                } @else if (notifications().length === 0) {
                   <div class="px-4 py-6 text-sm text-gray-500 text-center">Aucune notification</div>
                 } @else {
                   @for (notif of notifications(); track notif.id) {
                     <div class="px-4 py-3 hover:bg-gray-50 border-t border-gray-100 first:border-t-0">
                       <div class="flex items-start gap-2">
-                        <span class="mt-0.5 w-2.5 h-2.5 rounded-full" [class.bg-red-500]="!notif.read" [class.bg-gray-300]="notif.read"></span>
+                        <span class="mt-0.5 w-2.5 h-2.5 rounded-full" [class.bg-red-500]="!notif.isRead" [class.bg-gray-300]="notif.isRead"></span>
                         <div class="flex-1">
                           <p class="text-sm text-gray-800">{{ notif.title }}</p>
-                          @if (notif.description) {
-                            <p class="text-xs text-gray-500 mt-1">{{ notif.description }}</p>
+                          @if (notif.message) {
+                            <p class="text-xs text-gray-500 mt-1">{{ notif.message }}</p>
                           }
-                          <p class="text-[11px] text-gray-400 mt-1">{{ notif.time }}</p>
+                          <p class="text-[11px] text-gray-400 mt-1">{{ formatDate(notif.createdAt) }}</p>
                         </div>
-                        <button class="text-xs text-primary-600 hover:underline" (click)="markRead(notif.id)">Lu</button>
+                        <button class="text-xs text-primary-600 hover:underline" (click)="markRead(notif.id)" [disabled]="notif.isRead || notificationsLoading()">
+                          Lu
+                        </button>
                       </div>
                     </div>
                   }
                 }
+              </div>
+              <div class="border-t border-gray-100 mt-2">
+                <button class="w-full px-4 py-2 text-sm text-primary-600 hover:bg-gray-50 text-center" (click)="goToNotifications()">
+                  Voir tout
+                </button>
               </div>
             </div>
           }
@@ -95,14 +107,12 @@ export class HeaderComponent {
   menuToggle = output<void>();
   showDropdown = false;
   showNotifications = signal(false);
-  notifications = signal([
-    { id: 1, title: 'Nouvelle facture validée', description: 'Facture #2024-118', time: 'Il y a 2h', read: false },
-    { id: 2, title: 'Client ajouté', description: 'Société Alpha', time: 'Il y a 1j', read: false },
-    { id: 3, title: 'Rappel de paiement', description: 'Devis #2024-104', time: 'Il y a 3j', read: true }
-  ]);
+  notifications = this.notificationService.notifications;
+  notificationsLoading = signal(false);
 
   constructor(
     private authService: AuthService,
+    private notificationService: NotificationService,
     private router: Router
   ) {}
 
@@ -118,6 +128,9 @@ export class HeaderComponent {
   toggleNotifications() {
     this.showNotifications.update(v => !v);
     if (this.showDropdown) this.showDropdown = false;
+    if (this.showNotifications()) {
+      this.loadNotifications();
+    }
   }
 
   getUserName(): string {
@@ -141,14 +154,34 @@ export class HeaderComponent {
   }
 
   hasUnread() {
-    return this.notifications().some(n => !n.read);
+    return this.notifications().some(n => !n.isRead);
   }
 
-  markRead(id: number) {
-    this.notifications.update(list => list.map(n => n.id === id ? { ...n, read: true } : n));
+  markRead(id: string) {
+    this.notificationService.markRead(id);
   }
 
   markAllRead() {
-    this.notifications.update(list => list.map(n => ({ ...n, read: true })));
+    this.notificationService.markAllRead();
+  }
+
+  loadNotifications() {
+    this.notificationsLoading.set(true);
+    this.notificationService.list({ page: 1, limit: 5 }).finally(() => {
+      this.notificationsLoading.set(false);
+    });
+  }
+
+  goToNotifications() {
+    this.showNotifications.set(false);
+    this.router.navigate(['/notifications']);
+  }
+
+  formatDate(date?: Date): string {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('fr-FR', {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }).format(date);
   }
 }

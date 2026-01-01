@@ -222,6 +222,11 @@ export class InvoiceService {
       .then(() => undefined);
   }
 
+  downloadPdf(invoiceId: string): Promise<Blob> {
+    const url = `${this.configService.apiBaseUrl}/api/invoices/${encodeURIComponent(invoiceId)}/pdf`;
+    return firstValueFrom(this.http.get(url, { headers: this.authHeaders(), responseType: 'blob' }));
+  }
+
   private normalizeInvoice(response: InvoiceResponse | ApiInvoice, fallback?: CreateInvoicePayload): Invoice {
     const invoice = this.extractInvoice(response);
     const rawDefaultTaxRate = invoice.defaultTaxRate ?? invoice.taxRate ?? fallback?.defaultTaxRate ?? 0;

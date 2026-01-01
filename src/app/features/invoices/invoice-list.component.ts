@@ -107,6 +107,11 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
                     </td>
                     <td>
                       <div class="flex items-center space-x-3">
+                        <button (click)="downloadPdf(invoice.id)" class="text-gray-600 hover:text-gray-900" title="Télécharger PDF">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-3-3m3 3l3-3M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"/>
+                          </svg>
+                        </button>
                         <a [routerLink]="['/invoices', invoice.id]" class="text-primary-600 hover:text-primary-700">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -256,6 +261,17 @@ export class InvoiceListComponent implements OnInit {
   deleteInvoice(id: string) {
     this.pendingDeleteId.set(id);
     this.showDeleteModal.set(true);
+  }
+
+  async downloadPdf(id: string) {
+    try {
+      const blob = await this.invoiceService.downloadPdf(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      this.error.set('Impossible de télécharger la facture');
+    }
   }
 
   closeDeleteModal() {

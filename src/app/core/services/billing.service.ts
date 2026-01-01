@@ -13,6 +13,13 @@ export interface Subscription {
 }
 
 export type UpdateSubscriptionPayload = Partial<Subscription>;
+export interface UpdateSubscriptionResult {
+  subscription: Subscription;
+  message?: string;
+  requestedPlan?: SubscriptionPlan;
+  requestedStatus?: SubscriptionStatus;
+  note?: string;
+}
 
 export interface SubscriptionHistoryEntry {
   id: string;
@@ -29,8 +36,21 @@ interface ApiSubscription {
 }
 
 interface SubscriptionResponse {
-  data?: ApiSubscription;
+  data?: ApiSubscription & {
+    message?: string;
+    currentPlan?: string;
+    currentStatus?: string;
+    requestedPlan?: string;
+    requestedStatus?: string;
+    note?: string;
+  };
   subscription?: ApiSubscription;
+  message?: string;
+  currentPlan?: string;
+  currentStatus?: string;
+  requestedPlan?: string;
+  requestedStatus?: string;
+  note?: string;
 }
 
 interface ApiHistoryEntry {
@@ -69,10 +89,10 @@ export class BillingService {
       .then((response) => this.normalizeSubscription(response));
   }
 
-  updateSubscription(payload: UpdateSubscriptionPayload): Promise<Subscription> {
+  updateSubscription(payload: UpdateSubscriptionPayload): Promise<UpdateSubscriptionResult> {
     const url = `${this.configService.apiBaseUrl}/api/billing/subscription`;
     return firstValueFrom(this.http.patch<SubscriptionResponse | ApiSubscription>(url, payload, { headers: this.authHeaders() }))
-      .then((response) => this.normalizeSubscription(response, payload));
+      .then((response) => this.normalizeUpdateResponse(response, payload));
   }
 
   getHistory(params?: { page?: number; limit?: number }): Promise<{ entries: SubscriptionHistoryEntry[]; meta?: HistoryResponse['meta'] }> {
@@ -104,7 +124,54 @@ export class BillingService {
   }
 
   private isSubscriptionResponse(response: SubscriptionResponse | ApiSubscription): response is SubscriptionResponse {
-    return 'data' in response || 'subscription' in response;
+    return 'data' in response || 'subscription' in response || 'message' in response || 'currentPlan' in response;
+  }
+
+  private extractMessage(response: SubscriptionResponse | ApiSubscription): string | undefined {
+    if (this.isSubscriptionResponse(response)) {
+      return response.message ?? response.data?.message;
+    }
+    return undefined;
+  }
+
+  private normalizeUpdateResponse(
+    response: SubscriptionResponse | ApiSubscription,
+    fallback?: UpdateSubscriptionPayload
+  ): UpdateSubscriptionResult {
+    if (this.isSubscriptionResponse(response)) {
+      const plan = this.normalizePlan(
+        response.currentPlan ??
+          response.data?.currentPlan ??
+          response.data?.plan ??
+          response.subscription?.plan ??
+          fallback?.plan
+      );
+      const status = this.normalizeStatus(
+        response.currentStatus ??
+          response.data?.currentStatus ??
+          response.data?.status ??
+          response.subscription?.status ??
+          fallback?.status
+      );
+      return {
+        subscription: { plan, status },
+        message: response.message ?? response.data?.message,
+        requestedPlan: response.requestedPlan
+          ? this.normalizePlan(response.requestedPlan)
+          : response.data?.requestedPlan
+            ? this.normalizePlan(response.data.requestedPlan)
+            : undefined,
+        requestedStatus: response.requestedStatus
+          ? this.normalizeStatus(response.requestedStatus)
+          : response.data?.requestedStatus
+            ? this.normalizeStatus(response.data.requestedStatus)
+            : undefined,
+        note: response.note ?? response.data?.note
+      };
+    }
+    return {
+      subscription: this.normalizeSubscription(response, fallback)
+    };
   }
 
   private normalizePlan(value?: string): SubscriptionPlan {

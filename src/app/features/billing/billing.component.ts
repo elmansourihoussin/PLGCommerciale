@@ -9,6 +9,14 @@ import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../co
   template: `
     <div class="space-y-6">
       <h1 class="text-2xl font-bold text-gray-900">Abonnement & Facturation</h1>
+      @if (planMessage()) {
+        <div class="flex items-start gap-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 px-4 py-3 rounded-lg">
+          <svg class="w-5 h-5 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <p>{{ planMessage() }}</p>
+        </div>
+      }
 
       @if (error()) {
         <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -30,9 +38,10 @@ import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../co
             <p class="text-sm opacity-90">par mois</p>
           </div>
         </div>
+        
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
         <div class="card hover:shadow-lg transition-shadow">
           <div class="text-center">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Gratuit</h3>
@@ -106,48 +115,6 @@ import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../co
             </ul>
             <button class="btn-primary w-full" [disabled]="currentPlan() === 'PRO' || loading()" (click)="openPlanModal('PRO')">
               {{ currentPlan() === 'PRO' ? 'Plan actuel' : 'Upgrade' }}
-            </button>
-          </div>
-        </div>
-
-        <div class="card hover:shadow-lg transition-shadow">
-          <div class="text-center">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Entreprise</h3>
-            <div class="text-3xl font-bold text-gray-900 mb-4">Sur mesure</div>
-            <ul class="space-y-3 text-sm text-gray-600 mb-6">
-              <li class="flex items-center">
-                <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                Tout du plan Pro
-              </li>
-              <li class="flex items-center">
-                <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                Multi-utilisateurs
-              </li>
-              <li class="flex items-center">
-                <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                API personnalisée
-              </li>
-              <li class="flex items-center">
-                <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                Support dédié
-              </li>
-              <li class="flex items-center">
-                <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                Formation incluse
-              </li>
-            </ul>
-            <button class="btn-outline w-full" [disabled]="currentPlan() === 'ENTERPRISE' || loading()" (click)="openPlanModal('ENTERPRISE')">
-              {{ currentPlan() === 'ENTERPRISE' ? 'Plan actuel' : 'Nous contacter' }}
             </button>
           </div>
         </div>
@@ -250,6 +217,7 @@ export class BillingComponent implements OnInit {
   subscription = signal<Subscription>({ plan: 'FREE', status: 'INACTIVE' });
   loading = signal(false);
   error = signal('');
+  planMessage = signal('');
   history = signal<SubscriptionHistoryEntry[]>([]);
   historyLoading = signal(false);
   historyError = signal('');
@@ -281,12 +249,16 @@ export class BillingComponent implements OnInit {
   async changePlan(plan: Subscription['plan']) {
     this.loading.set(true);
     this.error.set('');
+    this.planMessage.set('');
     try {
-      const subscription = await this.billingService.updateSubscription({
+      const response = await this.billingService.updateSubscription({
         plan,
         status: 'ACTIVE'
       });
-      this.subscription.set(subscription);
+      this.subscription.set(response.subscription);
+      if (response.message || response.note) {
+        this.planMessage.set(response.message ?? response.note ?? '');
+      }
       await this.loadHistory();
     } catch {
       this.error.set('Impossible de modifier l’abonnement');
