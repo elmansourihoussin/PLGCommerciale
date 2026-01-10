@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
 import { PlatformTenantService } from '../../core/services/platform-tenant.service';
 
@@ -21,10 +21,13 @@ import { PlatformTenantService } from '../../core/services/platform-tenant.servi
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="card space-y-4">
+      <form #tenantForm="ngForm" (ngSubmit)="onSubmit(tenantForm)" class="card space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-          <input type="text" [(ngModel)]="name" name="name" class="input" required />
+          <input type="text" [(ngModel)]="name" name="name" class="input" required #nameRef="ngModel" />
+          @if (nameRef.invalid && nameRef.touched) {
+            <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+          }
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
@@ -32,7 +35,7 @@ import { PlatformTenantService } from '../../core/services/platform-tenant.servi
         </div>
         <div class="flex justify-end gap-3">
           <button type="button" class="btn-secondary" (click)="cancel()">Annuler</button>
-          <button type="submit" class="btn-primary" [disabled]="loading()">Créer</button>
+          <button type="submit" class="btn-primary" [disabled]="loading() || tenantForm.invalid">Créer</button>
         </div>
       </form>
     </div>
@@ -49,7 +52,13 @@ export class PlatformTenantCreateComponent {
     private router: Router
   ) {}
 
-  async onSubmit() {
+  async onSubmit(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     try {

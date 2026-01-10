@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { UserService, CreateUserPayload, UpdateUserPayload } from '../../core/services/user.service';
 import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../core/models/user.model';
@@ -24,30 +24,42 @@ import { User } from '../../core/models/user.model';
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form #userForm="ngForm" (ngSubmit)="onSubmit(userForm)" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-              <input type="text" [(ngModel)]="formData.fullName" name="fullName" class="input" required />
+              <input type="text" [(ngModel)]="formData.fullName" name="fullName" class="input" required #fullNameRef="ngModel" />
+              @if (fullNameRef.invalid && fullNameRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-              <input type="email" [(ngModel)]="formData.email" name="email" class="input" required />
+              <input type="email" [(ngModel)]="formData.email" name="email" class="input" required #emailRef="ngModel" />
+              @if (emailRef.invalid && emailRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Rôle *</label>
-              <select [(ngModel)]="formData.role" name="role" class="input" required>
+              <select [(ngModel)]="formData.role" name="role" class="input" required #roleRef="ngModel">
                 <option value="OWNER">Super administrateur</option>
                 <option value="ADMIN">Administrateur</option>
                 <option value="AGENT">Gestionnaire</option>
               </select>
+              @if (roleRef.invalid && roleRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             @if (!isEdit()) {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
-                <input type="password" [(ngModel)]="formData.password" name="password" class="input" required />
+                <input type="password" [(ngModel)]="formData.password" name="password" class="input" required #passwordRef="ngModel" />
+                @if (passwordRef.invalid && passwordRef.touched) {
+                  <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                }
               </div>
             }
           </div>
@@ -55,7 +67,7 @@ import { User } from '../../core/models/user.model';
 
         <div class="flex justify-end space-x-4">
           <button type="button" (click)="goBack()" class="btn-secondary">Annuler</button>
-          <button type="submit" class="btn-primary" [disabled]="loading()">
+          <button type="submit" class="btn-primary" [disabled]="loading() || userForm.invalid">
             {{ isEdit() ? 'Enregistrer' : 'Créer' }}
           </button>
         </div>
@@ -117,9 +129,15 @@ export class UserFormComponent implements OnInit {
     }
   }
 
-  async onSubmit() {
+  async onSubmit(form: NgForm) {
     if (!this.isAdmin()) {
       this.error.set('Action non autorisée');
+      return;
+    }
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
     this.loading.set(true);

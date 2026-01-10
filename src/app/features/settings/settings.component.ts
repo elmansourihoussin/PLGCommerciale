@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { UserListComponent } from '../users/user-list.component';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -58,7 +58,7 @@ import { Company } from '../../core/models/company.model';
 
         <div class="lg:col-span-2">
           @if (activeTab === 'company') {
-            <form (ngSubmit)="saveCompany()" class="space-y-6">
+            <form #companyForm="ngForm" (ngSubmit)="saveCompany(companyForm)" class="space-y-6">
               @if (companyError()) {
                 <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                   {{ companyError() }}
@@ -79,8 +79,12 @@ import { Company } from '../../core/models/company.model';
                       [(ngModel)]="companyData.name"
                       name="companyName"
                       required
+                      #companyNameRef="ngModel"
                       class="input"
                     />
+                    @if (companyNameRef.invalid && companyNameRef.touched) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -91,8 +95,12 @@ import { Company } from '../../core/models/company.model';
                         [(ngModel)]="companyData.ice"
                         name="ice"
                         required
+                        #iceRef="ngModel"
                         class="input"
                       />
+                      @if (iceRef.invalid && iceRef.touched) {
+                        <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      }
                     </div>
 
                     <div>
@@ -114,8 +122,12 @@ import { Company } from '../../core/models/company.model';
                         [(ngModel)]="companyData.email"
                         name="companyEmail"
                         required
+                        #companyEmailRef="ngModel"
                         class="input"
                       />
+                      @if (companyEmailRef.invalid && companyEmailRef.touched) {
+                        <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      }
                     </div>
 
                     <div>
@@ -125,8 +137,12 @@ import { Company } from '../../core/models/company.model';
                         [(ngModel)]="companyData.phone"
                         name="companyPhone"
                         required
+                        #companyPhoneRef="ngModel"
                         class="input"
                       />
+                      @if (companyPhoneRef.invalid && companyPhoneRef.touched) {
+                        <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      }
                     </div>
                   </div>
 
@@ -137,8 +153,12 @@ import { Company } from '../../core/models/company.model';
                       [(ngModel)]="companyData.address"
                       name="address"
                       required
+                      #addressRef="ngModel"
                       class="input"
                     />
+                    @if (addressRef.invalid && addressRef.touched) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -149,8 +169,12 @@ import { Company } from '../../core/models/company.model';
                         [(ngModel)]="companyData.city"
                         name="city"
                         required
+                        #cityRef="ngModel"
                         class="input"
                       />
+                      @if (cityRef.invalid && cityRef.touched) {
+                        <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      }
                     </div>
 
                     <div>
@@ -160,8 +184,12 @@ import { Company } from '../../core/models/company.model';
                         [(ngModel)]="companyData.country"
                         name="country"
                         required
+                        #countryRef="ngModel"
                         class="input"
                       />
+                      @if (countryRef.invalid && countryRef.touched) {
+                        <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      }
                     </div>
                   </div>
 
@@ -190,7 +218,7 @@ import { Company } from '../../core/models/company.model';
               </div>
 
               <div class="flex justify-end">
-                <button type="submit" class="btn-primary" [disabled]="companyLoading() || !isCompanyFormValid()">
+                <button type="submit" class="btn-primary" [disabled]="companyLoading() || companyForm.invalid">
                   @if (companyLoading()) {
                     <span>Enregistrement...</span>
                   } @else {
@@ -259,7 +287,7 @@ import { Company } from '../../core/models/company.model';
                 </div>
 
                 @if (showPasswordForm()) {
-                  <div class="pt-4">
+                  <form #passwordFormRef="ngForm" (ngSubmit)="changeMyPassword(passwordFormRef)" class="pt-4">
                     @if (passwordError()) {
                       <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                         {{ passwordError() }}
@@ -277,8 +305,13 @@ import { Company } from '../../core/models/company.model';
                           type="password"
                           [(ngModel)]="passwordForm.currentPassword"
                           name="currentPassword"
+                          required
+                          #currentPasswordRef="ngModel"
                           class="input"
                         />
+                        @if (currentPasswordRef.invalid && currentPasswordRef.touched) {
+                          <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                        }
                       </div>
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
@@ -286,8 +319,13 @@ import { Company } from '../../core/models/company.model';
                           type="password"
                           [(ngModel)]="passwordForm.newPassword"
                           name="newPassword"
+                          required
+                          #newPasswordRef="ngModel"
                           class="input"
                         />
+                        @if (newPasswordRef.invalid && newPasswordRef.touched) {
+                          <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                        }
                       </div>
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
@@ -295,10 +333,17 @@ import { Company } from '../../core/models/company.model';
                           type="password"
                           [(ngModel)]="passwordForm.confirmPassword"
                           name="confirmPassword"
+                          required
+                          #confirmPasswordRef="ngModel"
                           class="input"
                         />
+                        @if (confirmPasswordRef.invalid && confirmPasswordRef.touched) {
+                          <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                        } @else if (confirmPasswordRef.touched && passwordForm.confirmPassword && passwordForm.newPassword && passwordForm.confirmPassword !== passwordForm.newPassword) {
+                          <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
+                        }
                       </div>
-                      <button class="btn-outline w-full" [disabled]="passwordLoading()" (click)="changeMyPassword()">
+                      <button type="submit" class="btn-outline w-full" [disabled]="passwordLoading() || !isPasswordFormValid()">
                         @if (passwordLoading()) {
                           <span>Enregistrement...</span>
                         } @else {
@@ -306,7 +351,7 @@ import { Company } from '../../core/models/company.model';
                         }
                       </button>
                     </div>
-                  </div>
+                  </form>
                 }
 
               </div>
@@ -353,9 +398,11 @@ export class SettingsComponent implements OnInit {
     await this.refreshCompany();
   }
 
-  async saveCompany() {
-    if (!this.isCompanyFormValid()) {
+  async saveCompany(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
       this.companyError.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
     this.companyLoading.set(true);
@@ -404,6 +451,13 @@ export class SettingsComponent implements OnInit {
     });
   }
 
+  isPasswordFormValid(): boolean {
+    if (!this.passwordForm.currentPassword || !this.passwordForm.newPassword || !this.passwordForm.confirmPassword) {
+      return false;
+    }
+    return this.passwordForm.newPassword === this.passwordForm.confirmPassword;
+  }
+
   getUserInitials(): string {
     const name = this.currentUser()?.name || '';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -425,12 +479,14 @@ export class SettingsComponent implements OnInit {
     return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(date);
   }
 
-  async changeMyPassword() {
-    if (!this.passwordForm.currentPassword) {
-      this.passwordError.set('Le mot de passe actuel est obligatoire');
+  async changeMyPassword(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.passwordError.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
-    if (!this.passwordForm.newPassword || this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
+    if (this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
       this.passwordError.set('Les mots de passe ne correspondent pas');
       return;
     }

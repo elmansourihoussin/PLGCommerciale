@@ -1,6 +1,6 @@
 import { Component, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { UserService } from '../../core/services/user.service';
@@ -59,27 +59,38 @@ import { UserService } from '../../core/services/user.service';
               {{ passwordSuccess() }}
             </div>
           }
-          <div class="space-y-4">
+          <form #passwordFormRef="ngForm" (ngSubmit)="changeMyPassword(passwordFormRef)" class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe actuel</label>
-              <input type="password" [(ngModel)]="passwordForm.currentPassword" name="currentPassword" class="input" />
+              <input type="password" [(ngModel)]="passwordForm.currentPassword" name="currentPassword" class="input" required #currentPasswordRef="ngModel" />
+              @if (currentPasswordRef.invalid && currentPasswordRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
-              <input type="password" [(ngModel)]="passwordForm.newPassword" name="newPassword" class="input" />
+              <input type="password" [(ngModel)]="passwordForm.newPassword" name="newPassword" class="input" required #newPasswordRef="ngModel" />
+              @if (newPasswordRef.invalid && newPasswordRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
-              <input type="password" [(ngModel)]="passwordForm.confirmPassword" name="confirmPassword" class="input" />
+              <input type="password" [(ngModel)]="passwordForm.confirmPassword" name="confirmPassword" class="input" required #confirmPasswordRef="ngModel" />
+              @if (confirmPasswordRef.invalid && confirmPasswordRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              } @else if (confirmPasswordRef.touched && passwordForm.confirmPassword && passwordForm.newPassword && passwordForm.confirmPassword !== passwordForm.newPassword) {
+                <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
+              }
             </div>
-            <button class="btn-outline w-full" [disabled]="passwordLoading()" (click)="changeMyPassword()">
+            <button type="submit" class="btn-outline w-full" [disabled]="passwordLoading() || !isPasswordFormValid()">
               @if (passwordLoading()) {
                 <span>Enregistrement...</span>
               } @else {
                 <span>Changer le mot de passe</span>
               }
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>
@@ -122,12 +133,14 @@ export class ProfileComponent {
     return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(parsed);
   }
 
-  async changeMyPassword() {
-    if (!this.passwordForm.currentPassword) {
-      this.passwordError.set('Le mot de passe actuel est obligatoire');
+  async changeMyPassword(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.passwordError.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
-    if (!this.passwordForm.newPassword || this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
+    if (this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
       this.passwordError.set('Les mots de passe ne correspondent pas');
       return;
     }
@@ -149,5 +162,12 @@ export class ProfileComponent {
     } finally {
       this.passwordLoading.set(false);
     }
+  }
+
+  isPasswordFormValid(): boolean {
+    if (!this.passwordForm.currentPassword || !this.passwordForm.newPassword || !this.passwordForm.confirmPassword) {
+      return false;
+    }
+    return this.passwordForm.newPassword === this.passwordForm.confirmPassword;
   }
 }

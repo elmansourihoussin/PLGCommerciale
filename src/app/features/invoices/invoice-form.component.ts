@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { InvoiceService } from '../../core/services/invoice.service';
 import { ArticleService } from '../../core/services/article.service';
 import { ClientService } from '../../core/services/client.service';
@@ -10,7 +10,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
 @Component({
   selector: 'app-invoice-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -25,13 +25,13 @@ import { InvoiceLine } from '../../core/models/invoice.model';
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Client *</label>
-              <select [(ngModel)]="formData.clientId" name="clientId" required class="input">
+              <select formControlName="clientId" class="input">
                 <option value="">Sélectionner un client</option>
                 @if (clientsLoading()) {
                   <option value="" disabled>Chargement...</option>
@@ -41,45 +41,43 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                   }
                 }
               </select>
+              @if (isControlInvalid('clientId')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Titre *</label>
               <input
                 type="text"
-                [(ngModel)]="formData.title"
-                name="title"
-                required
+                formControlName="title"
                 class="input"
                 placeholder="Ex: Facture travaux octobre"
               />
+              @if (isControlInvalid('title')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
-              <input
-                type="date"
-                [(ngModel)]="formData.date"
-                name="date"
-                required
-                class="input"
-              />
+              <input type="date" formControlName="date" class="input" />
+              @if (isControlInvalid('date')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Date d'échéance *</label>
-              <input
-                type="date"
-                [(ngModel)]="formData.dueDate"
-                name="dueDate"
-                required
-                class="input"
-              />
+              <input type="date" formControlName="dueDate" class="input" />
+              @if (isControlInvalid('dueDate')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-              <select [(ngModel)]="formData.status" name="status" class="input">
+              <select formControlName="status" class="input">
                 <option value="unpaid">Impayée</option>
                 <option value="partially_paid">Partiellement payée</option>
                 <option value="paid">Payée</option>
@@ -89,7 +87,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Mode de paiement</label>
-              <select [(ngModel)]="formData.paymentMethod" name="paymentMethod" class="input">
+              <select formControlName="paymentMethod" class="input">
                 <option value="">Non spécifié</option>
                 <option value="cash">Espèces</option>
                 <option value="check">Chèque</option>
@@ -100,7 +98,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" formArrayName="lines">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Lignes de la facture</h2>
             <button type="button" (click)="addLine()" class="btn-secondary text-sm">
@@ -112,15 +110,14 @@ import { InvoiceLine } from '../../core/models/invoice.model';
           </div>
 
           <div class="space-y-3">
-            @for (line of formData.lines; track line.id; let i = $index) {
-              <div class="border border-gray-200 rounded-lg p-4">
+            @for (line of lines.controls; track $index; let i = $index) {
+              <div class="border border-gray-200 rounded-lg p-4" [formGroupName]="i">
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                   <div class="md:col-span-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Article</label>
                     <select
-                      [(ngModel)]="line.articleId"
-                      [name]="'article_' + i"
-                      (ngModelChange)="applyArticle(line)"
+                      formControlName="articleId"
+                      (change)="applyArticle(i)"
                       class="input"
                     >
                       <option value="">Libre</option>
@@ -133,41 +130,46 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <input
                       type="text"
-                      [(ngModel)]="line.description"
-                      [name]="'description_' + i"
+                      formControlName="description"
                       class="input"
                       placeholder="Description du service/produit"
                     />
+                    @if (isLineControlInvalid(i, 'description')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.quantity"
-                      [name]="'quantity_' + i"
-                      (ngModelChange)="updateLineTotal(line)"
+                      formControlName="quantity"
+                      (input)="updateLineTotal(i)"
                       class="input w-20"
                       min="1"
                     />
+                    @if (isLineControlInvalid(i, 'quantity')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.unitPrice"
-                      [name]="'unitPrice_' + i"
-                      (ngModelChange)="updateLineTotal(line)"
+                      formControlName="unitPrice"
+                      (input)="updateLineTotal(i)"
                       class="input"
                       min="0"
                     />
+                    @if (isLineControlInvalid(i, 'unitPrice')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-gray-700 mb-1">TVA (%)</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.taxRate"
-                      [name]="'taxRate_' + i"
-                      (ngModelChange)="calculateTotals()"
+                      formControlName="taxRate"
+                      (input)="calculateTotals()"
                       class="input w-20"
                       min="0"
                       max="100"
@@ -177,7 +179,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                     <label class="block text-sm font-medium text-gray-700 mb-1">Total</label>
                     <input
                       type="text"
-                      [value]="line.total.toLocaleString() + ' MAD'"
+                      [value]="getLineTotal(i).toLocaleString() + ' MAD'"
                       readonly
                       class="input bg-gray-50"
                     />
@@ -221,8 +223,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
           <textarea
-            [(ngModel)]="formData.notes"
-            name="notes"
+            formControlName="notes"
             rows="4"
             class="input"
             placeholder="Notes additionnelles..."
@@ -233,7 +234,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary">
+          <button type="submit" class="btn-primary" [disabled]="form.invalid || !areLinesValid()">
             {{ isEdit() ? 'Mettre à jour' : 'Créer la facture' }}
           </button>
         </div>
@@ -248,16 +249,7 @@ export class InvoiceFormComponent implements OnInit {
   clientsLoading = signal(false);
   clientsError = signal('');
 
-  formData: any = {
-    clientId: '',
-    title: '',
-    date: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    lines: [],
-    status: 'unpaid',
-    paymentMethod: '',
-    notes: ''
-  };
+  form: FormGroup;
 
   totals = signal({
     subtotal: 0,
@@ -270,8 +262,24 @@ export class InvoiceFormComponent implements OnInit {
     private clientService: ClientService,
     private articleService: ArticleService,
     private route: ActivatedRoute,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      clientId: ['', Validators.required],
+      title: ['', Validators.required],
+      date: [new Date().toISOString().split('T')[0], Validators.required],
+      dueDate: [new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], Validators.required],
+      status: ['unpaid'],
+      paymentMethod: [''],
+      notes: [''],
+      lines: this.fb.array<FormGroup>([])
+    });
+  }
+
+  get lines(): FormArray {
+    return this.form.get('lines') as FormArray;
+  }
 
   async ngOnInit() {
     await Promise.all([
@@ -289,12 +297,27 @@ export class InvoiceFormComponent implements OnInit {
 
   async loadInvoice(id: string) {
     const invoice = await this.invoiceService.getById(id);
-    this.formData = {
-      ...invoice,
+    this.form.patchValue({
+      clientId: invoice.clientId,
+      title: invoice.title,
       date: new Date(invoice.date).toISOString().split('T')[0],
       dueDate: new Date(invoice.dueDate).toISOString().split('T')[0],
-      paymentMethod: this.mapPaymentMethodFromApi(invoice.paymentMethod)
-    };
+      status: invoice.status,
+      paymentMethod: this.mapPaymentMethodFromApi(invoice.paymentMethod),
+      notes: invoice.notes ?? ''
+    });
+
+    this.lines.clear();
+    invoice.lines.forEach((line) => {
+      this.lines.push(this.createLine({
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: line.taxRate,
+        articleId: line.articleId
+      }));
+    });
+
     this.calculateTotals();
   }
 
@@ -303,50 +326,74 @@ export class InvoiceFormComponent implements OnInit {
     this.clientsError.set('');
     try {
       await this.clientService.list();
-    } catch (err) {
+    } catch {
       this.clientsError.set('Impossible de charger les clients');
     } finally {
       this.clientsLoading.set(false);
     }
   }
 
-  addLine() {
-    this.formData.lines.push({
-      id: Date.now().toString(),
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      total: 0,
-      taxRate: undefined,
-      articleId: undefined
+  createLine(data?: Partial<InvoiceLine>): FormGroup {
+    const quantity = data?.quantity ?? 1;
+    const unitPrice = data?.unitPrice ?? 0;
+    const total = quantity * unitPrice;
+    return this.fb.group({
+      articleId: [data?.articleId ?? ''],
+      description: [data?.description ?? '', Validators.required],
+      quantity: [quantity, [Validators.required, Validators.min(1)]],
+      unitPrice: [unitPrice, [Validators.required, Validators.min(0)]],
+      taxRate: [data?.taxRate ?? null],
+      total: [{ value: total, disabled: true }]
     });
   }
 
+  addLine() {
+    this.lines.push(this.createLine());
+    this.calculateTotals();
+  }
+
   removeLine(index: number) {
-    this.formData.lines.splice(index, 1);
+    this.lines.removeAt(index);
     this.calculateTotals();
   }
 
-  updateLineTotal(line: InvoiceLine) {
-    line.total = line.quantity * line.unitPrice;
+  updateLineTotal(index: number) {
+    const line = this.lines.at(index) as FormGroup;
+    const quantity = Number(line.get('quantity')?.value || 0);
+    const unitPrice = Number(line.get('unitPrice')?.value || 0);
+    const total = quantity * unitPrice;
+    line.get('total')?.setValue(total, { emitEvent: false });
     this.calculateTotals();
   }
 
-  applyArticle(line: InvoiceLine) {
-    if (!line.articleId) return;
-    const article = this.articles().find(a => a.id === line.articleId);
+  applyArticle(index: number) {
+    const line = this.lines.at(index) as FormGroup;
+    const articleId = line.get('articleId')?.value;
+    if (!articleId) return;
+    const article = this.articles().find(a => a.id === articleId);
     if (!article) return;
-    line.description = article.name;
-    line.unitPrice = article.unitPrice;
-    line.taxRate = article.taxRate !== undefined ? article.taxRate * 100 : line.taxRate;
-    this.updateLineTotal(line);
+    line.patchValue({
+      description: article.name,
+      unitPrice: article.unitPrice,
+      taxRate: article.taxRate !== undefined ? article.taxRate * 100 : line.get('taxRate')?.value
+    });
+    this.updateLineTotal(index);
+  }
+
+  getLineTotal(index: number): number {
+    const line = this.lines.at(index) as FormGroup;
+    return Number(line.get('total')?.value ?? 0);
   }
 
   calculateTotals() {
-    const subtotal = this.formData.lines.reduce((sum: number, line: InvoiceLine) => sum + line.total, 0);
-    const taxAmount = this.formData.lines.reduce((sum: number, line: InvoiceLine) => {
-      const lineTaxRate = line.taxRate ?? 0;
-      return sum + (line.total * (lineTaxRate / 100));
+    const subtotal = this.lines.controls.reduce((sum, control) => {
+      const total = Number(control.get('total')?.value ?? 0);
+      return sum + total;
+    }, 0);
+    const taxAmount = this.lines.controls.reduce((sum, control) => {
+      const lineTotal = Number(control.get('total')?.value ?? 0);
+      const lineTaxRate = Number(control.get('taxRate')?.value ?? 0);
+      return sum + (lineTotal * (lineTaxRate / 100));
     }, 0);
     const total = subtotal + taxAmount;
 
@@ -358,25 +405,28 @@ export class InvoiceFormComponent implements OnInit {
   }
 
   async onSubmit() {
-    if (!this.formData.clientId || !this.formData.title || this.formData.lines.length === 0) {
-      alert('Veuillez remplir tous les champs requis et ajouter au moins une ligne');
+    if (this.form.invalid || !this.areLinesValid()) {
+      this.form.markAllAsTouched();
+      this.lines.markAllAsTouched();
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
+    const formValue = this.form.getRawValue();
     const invoiceData = {
-      clientId: this.formData.clientId,
-      title: this.formData.title,
-      note: this.formData.notes,
-      paymentMethod: this.mapPaymentMethod(this.formData.paymentMethod),
-      invoiceDate: new Date(this.formData.date).toISOString().split('T')[0],
-      dueDate: new Date(this.formData.dueDate).toISOString().split('T')[0],
-      status: this.formData.status,
-      items: this.formData.lines.map((line: InvoiceLine) => ({
+      clientId: formValue.clientId,
+      title: formValue.title,
+      note: formValue.notes,
+      paymentMethod: this.mapPaymentMethod(formValue.paymentMethod),
+      invoiceDate: formValue.date,
+      dueDate: formValue.dueDate,
+      status: formValue.status,
+      items: formValue.lines.map((line: InvoiceLine) => ({
         label: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         taxRate: this.normalizeLineTaxRate(line.taxRate),
-        articleId: line.articleId
+        articleId: line.articleId || undefined
       }))
     };
 
@@ -391,6 +441,21 @@ export class InvoiceFormComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/invoices']);
+  }
+
+  isControlInvalid(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.invalid && control.touched);
+  }
+
+  isLineControlInvalid(index: number, name: string): boolean {
+    const line = this.lines.at(index);
+    const control = line?.get(name);
+    return Boolean(control && control.invalid && control.touched);
+  }
+
+  areLinesValid(): boolean {
+    return this.lines.length > 0 && this.lines.valid;
   }
 
   private normalizeTaxRate(value: number): number {

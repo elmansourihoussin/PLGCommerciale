@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { PlatformTenantService } from '../../core/services/platform-tenant.service';
 import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/platform-tenant.model';
@@ -52,19 +52,25 @@ import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/pl
 
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Abonnement</h2>
-          <div class="space-y-4">
+          <form #subscriptionForm="ngForm" (ngSubmit)="updateSubscription(subscriptionForm)" class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-              <input type="text" [(ngModel)]="subscriptionPlan" class="input" placeholder="PRO" />
+              <input type="text" [(ngModel)]="subscriptionPlan" class="input" placeholder="PRO" required #planRef="ngModel" />
+              @if (planRef.invalid && planRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-              <input type="text" [(ngModel)]="subscriptionStatus" class="input" placeholder="ACTIVE" />
+              <input type="text" [(ngModel)]="subscriptionStatus" class="input" placeholder="ACTIVE" required #statusRef="ngModel" />
+              @if (statusRef.invalid && statusRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
-            <button class="btn-primary w-full" (click)="updateSubscription()" [disabled]="loading()">
+            <button type="submit" class="btn-primary w-full" [disabled]="loading() || !isSubscriptionFormValid()">
               Mettre à jour
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -158,9 +164,15 @@ export class PlatformTenantDetailComponent implements OnInit {
     }
   }
 
-  async updateSubscription() {
+  async updateSubscription(form?: NgForm) {
     const tenant = this.tenant();
     if (!tenant) return;
+    if (form?.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
     this.loading.set(true);
     try {
       const updated = await this.platformTenantService.updateSubscription(tenant.id, {
@@ -199,5 +211,9 @@ export class PlatformTenantDetailComponent implements OnInit {
       dateStyle: 'medium',
       timeStyle: 'short'
     }).format(date);
+  }
+
+  isSubscriptionFormValid(): boolean {
+    return Boolean(this.subscriptionPlan?.trim()) && Boolean(this.subscriptionStatus?.trim());
   }
 }

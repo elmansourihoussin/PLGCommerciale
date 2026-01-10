@@ -1,16 +1,16 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { QuoteService } from '../../core/services/quote.service';
 import { ClientService } from '../../core/services/client.service';
 import { ArticleService } from '../../core/services/article.service';
-import { Quote, QuoteLine } from '../../core/models/quote.model';
+import { QuoteLine } from '../../core/models/quote.model';
 
 @Component({
   selector: 'app-quote-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -19,57 +19,55 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
         </h1>
       </div>
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Client *</label>
-              <select [(ngModel)]="formData.clientId" name="clientId" required class="input">
+              <select formControlName="clientId" class="input">
                 <option value="">Sélectionner un client</option>
                 @for (client of clients(); track client.id) {
                   <option [value]="client.id">{{ client.name }}</option>
                 }
               </select>
+              @if (isControlInvalid('clientId')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Titre *</label>
               <input
                 type="text"
-                [(ngModel)]="formData.title"
-                name="title"
-                required
+                formControlName="title"
                 class="input"
                 placeholder="Ex: Travaux de plomberie"
               />
+              @if (isControlInvalid('title')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
-              <input
-                type="date"
-                [(ngModel)]="formData.date"
-                name="date"
-                required
-                class="input"
-              />
+              <input type="date" formControlName="date" class="input" />
+              @if (isControlInvalid('date')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Validité jusqu'au *</label>
-              <input
-                type="date"
-                [(ngModel)]="formData.validUntil"
-                name="validUntil"
-                required
-                class="input"
-              />
+              <input type="date" formControlName="validUntil" class="input" />
+              @if (isControlInvalid('validUntil')) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-              <select [(ngModel)]="formData.status" name="status" class="input">
+              <select formControlName="status" class="input">
                 <option value="draft">Brouillon</option>
                 <option value="sent">Envoyé</option>
                 <option value="accepted">Accepté</option>
@@ -79,7 +77,7 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" formArrayName="lines">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Lignes du devis</h2>
             <button type="button" (click)="addLine()" class="btn-secondary text-sm">
@@ -91,15 +89,14 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
           </div>
 
           <div class="space-y-3">
-            @for (line of formData.lines; track line.id; let i = $index) {
-              <div class="border border-gray-200 rounded-lg p-4">
+            @for (line of lines.controls; track $index; let i = $index) {
+              <div class="border border-gray-200 rounded-lg p-4" [formGroupName]="i">
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                   <div class="md:col-span-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Article</label>
                     <select
-                      [(ngModel)]="line.articleId"
-                      [name]="'article_' + i"
-                      (ngModelChange)="applyArticle(line)"
+                      formControlName="articleId"
+                      (change)="applyArticle(i)"
                       class="input"
                     >
                       <option value="">Libre</option>
@@ -112,41 +109,46 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <input
                       type="text"
-                      [(ngModel)]="line.description"
-                      [name]="'description_' + i"
+                      formControlName="description"
                       class="input"
                       placeholder="Description du service/produit"
                     />
+                    @if (isLineControlInvalid(i, 'description')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.quantity"
-                      [name]="'quantity_' + i"
-                      (ngModelChange)="updateLineTotal(line)"
+                      formControlName="quantity"
+                      (input)="updateLineTotal(i)"
                       class="input w-20"
                       min="1"
                     />
+                    @if (isLineControlInvalid(i, 'quantity')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.unitPrice"
-                      [name]="'unitPrice_' + i"
-                      (ngModelChange)="updateLineTotal(line)"
+                      formControlName="unitPrice"
+                      (input)="updateLineTotal(i)"
                       class="input"
                       min="0"
                     />
+                    @if (isLineControlInvalid(i, 'unitPrice')) {
+                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                    }
                   </div>
                   <div class="md:col-span-1">
                     <label class="block text-sm font-medium text-gray-700 mb-1">TVA (%)</label>
                     <input
                       type="number"
-                      [(ngModel)]="line.taxRate"
-                      [name]="'taxRate_' + i"
-                      (ngModelChange)="calculateTotals()"
+                      formControlName="taxRate"
+                      (input)="calculateTotals()"
                       class="input w-20"
                       min="0"
                       max="100"
@@ -156,7 +158,7 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
                     <label class="block text-sm font-medium text-gray-700 mb-1">Total</label>
                     <input
                       type="text"
-                      [value]="line.total.toLocaleString() + ' MAD'"
+                      [value]="getLineTotal(i).toLocaleString() + ' MAD'"
                       readonly
                       class="input bg-gray-50"
                     />
@@ -200,8 +202,7 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
           <textarea
-            [(ngModel)]="formData.notes"
-            name="notes"
+            formControlName="notes"
             rows="4"
             class="input"
             placeholder="Notes additionnelles..."
@@ -212,7 +213,7 @@ import { Quote, QuoteLine } from '../../core/models/quote.model';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary">
+          <button type="submit" class="btn-primary" [disabled]="form.invalid || !areLinesValid()">
             {{ isEdit() ? 'Mettre à jour' : 'Créer le devis' }}
           </button>
         </div>
@@ -225,15 +226,7 @@ export class QuoteFormComponent implements OnInit {
   clients = this.clientService.clients;
   articles = this.articleService.articles;
 
-  formData: any = {
-    clientId: '',
-    title: '',
-    date: new Date().toISOString().split('T')[0],
-    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    lines: [],
-    status: 'draft',
-    notes: ''
-  };
+  form: FormGroup;
 
   totals = signal({
     subtotal: 0,
@@ -246,8 +239,23 @@ export class QuoteFormComponent implements OnInit {
     private clientService: ClientService,
     private articleService: ArticleService,
     private route: ActivatedRoute,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      clientId: ['', Validators.required],
+      title: ['', Validators.required],
+      date: [new Date().toISOString().split('T')[0], Validators.required],
+      validUntil: [new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], Validators.required],
+      status: ['draft'],
+      notes: [''],
+      lines: this.fb.array<FormGroup>([])
+    });
+  }
+
+  get lines(): FormArray {
+    return this.form.get('lines') as FormArray;
+  }
 
   async ngOnInit() {
     await Promise.all([
@@ -265,51 +273,76 @@ export class QuoteFormComponent implements OnInit {
 
   async loadQuote(id: string) {
     const quote = await this.quoteService.getById(id);
-    this.formData = {
-      ...quote,
+    this.form.patchValue({
+      clientId: quote.clientId,
+      title: quote.title,
       date: new Date(quote.date).toISOString().split('T')[0],
-      validUntil: new Date(quote.validUntil).toISOString().split('T')[0]
-    };
+      validUntil: new Date(quote.validUntil).toISOString().split('T')[0],
+      status: quote.status,
+      notes: quote.notes ?? ''
+    });
+
+    this.lines.clear();
+    quote.lines.forEach((line) => {
+      this.lines.push(this.createLine({
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: line.taxRate,
+        articleId: line.articleId
+      }));
+    });
+
     this.calculateTotals();
   }
 
   addLine() {
-    this.formData.lines.push({
-      id: Date.now().toString(),
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      total: 0,
-      taxRate: undefined,
-      articleId: undefined
-    });
+    this.lines.push(this.createLine());
+    this.calculateTotals();
   }
 
   removeLine(index: number) {
-    this.formData.lines.splice(index, 1);
+    this.lines.removeAt(index);
     this.calculateTotals();
   }
 
-  updateLineTotal(line: QuoteLine) {
-    line.total = line.quantity * line.unitPrice;
+  updateLineTotal(index: number) {
+    const line = this.lines.at(index) as FormGroup;
+    const quantity = Number(line.get('quantity')?.value || 0);
+    const unitPrice = Number(line.get('unitPrice')?.value || 0);
+    const total = quantity * unitPrice;
+    line.get('total')?.setValue(total, { emitEvent: false });
     this.calculateTotals();
   }
 
-  applyArticle(line: QuoteLine) {
-    if (!line.articleId) return;
-    const article = this.articles().find(a => a.id === line.articleId);
+  applyArticle(index: number) {
+    const line = this.lines.at(index) as FormGroup;
+    const articleId = line.get('articleId')?.value;
+    if (!articleId) return;
+    const article = this.articles().find(a => a.id === articleId);
     if (!article) return;
-    line.description = article.name;
-    line.unitPrice = article.unitPrice;
-    line.taxRate = article.taxRate !== undefined ? article.taxRate * 100 : line.taxRate;
-    this.updateLineTotal(line);
+    line.patchValue({
+      description: article.name,
+      unitPrice: article.unitPrice,
+      taxRate: article.taxRate !== undefined ? article.taxRate * 100 : line.get('taxRate')?.value
+    });
+    this.updateLineTotal(index);
+  }
+
+  getLineTotal(index: number): number {
+    const line = this.lines.at(index) as FormGroup;
+    return Number(line.get('total')?.value ?? 0);
   }
 
   calculateTotals() {
-    const subtotal = this.formData.lines.reduce((sum: number, line: QuoteLine) => sum + line.total, 0);
-    const taxAmount = this.formData.lines.reduce((sum: number, line: QuoteLine) => {
-      const lineTaxRate = line.taxRate ?? 0;
-      return sum + (line.total * (lineTaxRate / 100));
+    const subtotal = this.lines.controls.reduce((sum, control) => {
+      const total = Number(control.get('total')?.value ?? 0);
+      return sum + total;
+    }, 0);
+    const taxAmount = this.lines.controls.reduce((sum, control) => {
+      const lineTotal = Number(control.get('total')?.value ?? 0);
+      const lineTaxRate = Number(control.get('taxRate')?.value ?? 0);
+      return sum + (lineTotal * (lineTaxRate / 100));
     }, 0);
     const total = subtotal + taxAmount;
 
@@ -321,24 +354,27 @@ export class QuoteFormComponent implements OnInit {
   }
 
   async onSubmit() {
-    if (!this.formData.clientId || !this.formData.title || this.formData.lines.length === 0) {
-      alert('Veuillez remplir tous les champs requis et ajouter au moins une ligne');
+    if (this.form.invalid || !this.areLinesValid()) {
+      this.form.markAllAsTouched();
+      this.lines.markAllAsTouched();
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
+    const formValue = this.form.getRawValue();
     const quoteData = {
-      clientId: this.formData.clientId,
-      title: this.formData.title,
-      date: new Date(this.formData.date).toISOString().split('T')[0],
-      validUntil: new Date(this.formData.validUntil).toISOString().split('T')[0],
-      status: this.formData.status,
-      note: this.formData.notes,
-      items: this.formData.lines.map((line: QuoteLine) => ({
+      clientId: formValue.clientId,
+      title: formValue.title,
+      date: formValue.date,
+      validUntil: formValue.validUntil,
+      status: formValue.status,
+      note: formValue.notes,
+      items: formValue.lines.map((line: QuoteLine) => ({
         label: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         taxRate: this.normalizeLineTaxRate(line.taxRate),
-        articleId: line.articleId
+        articleId: line.articleId || undefined
       }))
     };
 
@@ -357,6 +393,35 @@ export class QuoteFormComponent implements OnInit {
 
   private async loadClients() {
     await this.clientService.list();
+  }
+
+  createLine(data?: Partial<QuoteLine>): FormGroup {
+    const quantity = data?.quantity ?? 1;
+    const unitPrice = data?.unitPrice ?? 0;
+    const total = quantity * unitPrice;
+    return this.fb.group({
+      articleId: [data?.articleId ?? ''],
+      description: [data?.description ?? '', Validators.required],
+      quantity: [quantity, [Validators.required, Validators.min(1)]],
+      unitPrice: [unitPrice, [Validators.required, Validators.min(0)]],
+      taxRate: [data?.taxRate ?? null],
+      total: [{ value: total, disabled: true }]
+    });
+  }
+
+  isControlInvalid(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.invalid && control.touched);
+  }
+
+  isLineControlInvalid(index: number, name: string): boolean {
+    const line = this.lines.at(index);
+    const control = line?.get(name);
+    return Boolean(control && control.invalid && control.touched);
+  }
+
+  areLinesValid(): boolean {
+    return this.lines.length > 0 && this.lines.valid;
   }
 
   private normalizeLineTaxRate(value?: number): number | undefined {

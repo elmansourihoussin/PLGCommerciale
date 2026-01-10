@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -17,7 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <div class="card">
-          <form (ngSubmit)="onSubmit()" class="space-y-6">
+          <form #registerForm="ngForm" (ngSubmit)="onSubmit(registerForm)" class="space-y-6">
             @if (error()) {
               <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {{ error() }}
@@ -31,9 +31,13 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="companyName"
                 name="companyName"
                 required
+                #companyNameRef="ngModel"
                 class="input"
                 placeholder="Atelier Atlas"
               />
+              @if (companyNameRef.invalid && companyNameRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -43,9 +47,13 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="phone"
                 name="phone"
                 required
+                #phoneRef="ngModel"
                 class="input"
                 placeholder="0600000000"
               />
+              @if (phoneRef.invalid && phoneRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -55,9 +63,13 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="companyEmail"
                 name="companyEmail"
                 required
+                #companyEmailRef="ngModel"
                 class="input"
                 placeholder="contact@atlas.ma"
               />
+              @if (companyEmailRef.invalid && companyEmailRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -67,9 +79,13 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="fullName"
                 name="fullName"
                 required
+                #fullNameRef="ngModel"
                 class="input"
                 placeholder="Owner Atlas"
               />
+              @if (fullNameRef.invalid && fullNameRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -79,9 +95,13 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="password"
                 name="password"
                 required
+                #passwordRef="ngModel"
                 class="input"
                 placeholder="••••••••"
               />
+              @if (passwordRef.invalid && passwordRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -91,14 +111,20 @@ import { AuthService } from '../../core/services/auth.service';
                 [(ngModel)]="confirmPassword"
                 name="confirmPassword"
                 required
+                #confirmPasswordRef="ngModel"
                 class="input"
                 placeholder="••••••••"
               />
+              @if (confirmPasswordRef.invalid && confirmPasswordRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              } @else if (confirmPasswordRef.touched && confirmPassword && password && confirmPassword !== password) {
+                <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
+              }
             </div>
 
             <button
               type="submit"
-              [disabled]="loading()"
+              [disabled]="loading() || registerForm.invalid || !passwordsMatch()"
               class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               @if (loading()) {
@@ -135,7 +161,13 @@ export class RegisterComponent {
     private router: Router
   ) {}
 
-  async onSubmit() {
+  async onSubmit(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
     if (!this.companyName || !this.phone || !this.companyEmail || !this.fullName || !this.password || !this.confirmPassword) {
       this.error.set('Veuillez remplir tous les champs');
       return;
@@ -168,5 +200,9 @@ export class RegisterComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  passwordsMatch(): boolean {
+    return Boolean(this.password) && this.password === this.confirmPassword;
   }
 }

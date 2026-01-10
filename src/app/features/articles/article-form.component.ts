@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { ArticleService, CreateArticlePayload } from '../../core/services/article.service';
 
 @Component({
@@ -22,7 +22,7 @@ import { ArticleService, CreateArticlePayload } from '../../core/services/articl
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form #articleForm="ngForm" (ngSubmit)="onSubmit(articleForm)" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations</h2>
           <div class="mb-4">
@@ -34,7 +34,10 @@ import { ArticleService, CreateArticlePayload } from '../../core/services/articl
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-              <input type="text" [(ngModel)]="formData.name" name="name" class="input" required />
+              <input type="text" [(ngModel)]="formData.name" name="name" class="input" required #nameRef="ngModel" />
+              @if (nameRef.invalid && nameRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             @if (!formData.isService) {
               <div>
@@ -44,7 +47,10 @@ import { ArticleService, CreateArticlePayload } from '../../core/services/articl
             }
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Prix unitaire *</label>
-              <input type="number" [(ngModel)]="formData.unitPrice" name="unitPrice" class="input" min="0" required />
+              <input type="number" [(ngModel)]="formData.unitPrice" name="unitPrice" class="input" min="0" required #unitPriceRef="ngModel" />
+              @if (unitPriceRef.invalid && unitPriceRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">TVA (%)</label>
@@ -65,7 +71,7 @@ import { ArticleService, CreateArticlePayload } from '../../core/services/articl
 
         <div class="flex justify-end space-x-4">
           <button type="button" (click)="goBack()" class="btn-secondary">Annuler</button>
-          <button type="submit" class="btn-primary" [disabled]="loading()">
+          <button type="submit" class="btn-primary" [disabled]="loading() || articleForm.invalid">
             {{ isEdit() ? 'Enregistrer' : 'Créer' }}
           </button>
         </div>
@@ -122,7 +128,13 @@ export class ArticleFormComponent implements OnInit {
     }
   }
 
-  async onSubmit() {
+  async onSubmit(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     try {

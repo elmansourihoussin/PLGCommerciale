@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { ClientService } from '../../core/services/client.service';
 
 @Component({
@@ -16,7 +16,7 @@ import { ClientService } from '../../core/services/client.service';
         </h1>
       </div>
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form #clientForm="ngForm" (ngSubmit)="onSubmit(clientForm)" class="space-y-6">
         @if (error()) {
           <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {{ error() }}
@@ -32,9 +32,13 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.name"
                 name="name"
                 required
+                #nameRef="ngModel"
                 class="input"
                 placeholder="Hassan Bennani"
               />
+              @if (nameRef.invalid && nameRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -44,9 +48,13 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.email"
                 name="email"
                 required
+                #emailRef="ngModel"
                 class="input"
                 placeholder="hassan@example.com"
               />
+              @if (emailRef.invalid && emailRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -56,9 +64,13 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.phone"
                 name="phone"
                 required
+                #phoneRef="ngModel"
                 class="input"
                 placeholder="+212 6 12 34 56 78"
               />
+              @if (phoneRef.invalid && phoneRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div class="md:col-span-2">
@@ -68,9 +80,13 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.address"
                 name="address"
                 required
+                #addressRef="ngModel"
                 class="input"
                 placeholder="12 Rue Mohammed V, Casablanca"
               />
+              @if (addressRef.invalid && addressRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -80,9 +96,13 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.city"
                 name="city"
                 required
+                #cityRef="ngModel"
                 class="input"
                 placeholder="Casablanca"
               />
+              @if (cityRef.invalid && cityRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -102,7 +122,7 @@ import { ClientService } from '../../core/services/client.service';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary" [disabled]="loading()">
+          <button type="submit" class="btn-primary" [disabled]="loading() || clientForm.invalid">
             @if (loading()) {
               <span>Enregistrement...</span>
             } @else {
@@ -163,9 +183,11 @@ export class ClientFormComponent implements OnInit {
     }
   }
 
-  async onSubmit() {
-    if (!this.formData.name || !this.formData.email || !this.formData.phone || !this.formData.address || !this.formData.city) {
-      this.error.set('Veuillez remplir tous les champs requis');
+  async onSubmit(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      this.error.set('Veuillez remplir tous les champs obligatoires');
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
 

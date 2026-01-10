@@ -20,13 +20,22 @@
   .btn-primary {
     @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
   }
+  .btn-primary:disabled {
+    @apply bg-gray-300 text-gray-500 cursor-not-allowed hover:bg-gray-300;
+  }
 
   .btn-secondary {
     @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-500;
   }
+  .btn-secondary:disabled {
+    @apply bg-gray-200 text-gray-500 cursor-not-allowed hover:bg-gray-200;
+  }
 
   .btn-outline {
     @apply btn border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+  }
+  .btn-outline:disabled {
+    @apply border-gray-200 text-gray-400 cursor-not-allowed hover:bg-transparent;
   }
 
   .input {

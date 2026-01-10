@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { CheckService, CreateCheckPayload } from '../../core/services/check.service';
 import { ClientService } from '../../core/services/client.service';
 
@@ -23,18 +23,21 @@ import { ClientService } from '../../core/services/client.service';
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="space-y-6">
+      <form #checkForm="ngForm" (ngSubmit)="onSubmit(checkForm)" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations du chèque</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Client</label>
-              <select [(ngModel)]="formData.clientId" name="clientId" class="input" required>
+              <select [(ngModel)]="formData.clientId" name="clientId" class="input" required #clientRef="ngModel">
                 <option value="">Sélectionner un client</option>
                 @for (client of clients(); track client.id) {
                   <option [value]="client.id">{{ client.name }}</option>
                 }
               </select>
+              @if (clientRef.invalid && clientRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -44,10 +47,14 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.amount"
                 name="amount"
                 required
+                #amountRef="ngModel"
                 class="input"
                 min="0"
                 step="0.01"
               />
+              @if (amountRef.invalid && amountRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -57,8 +64,12 @@ import { ClientService } from '../../core/services/client.service';
                 [(ngModel)]="formData.dueDate"
                 name="dueDate"
                 required
+                #dueDateRef="ngModel"
                 class="input"
               />
+              @if (dueDateRef.invalid && dueDateRef.touched) {
+                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              }
             </div>
 
             <div>
@@ -76,7 +87,7 @@ import { ClientService } from '../../core/services/client.service';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary" [disabled]="loading()">
+          <button type="submit" class="btn-primary" [disabled]="loading() || checkForm.invalid">
             {{ isEdit() ? 'Mettre à jour' : 'Créer le chèque' }}
           </button>
         </div>
@@ -131,9 +142,10 @@ export class CheckFormComponent implements OnInit {
     }
   }
 
-  async onSubmit() {
-    if (!this.formData.clientId || !this.formData.amount || !this.formData.dueDate) {
-      alert('Veuillez remplir tous les champs requis');
+  async onSubmit(form: NgForm) {
+    if (form.invalid) {
+      form.form.markAllAsTouched();
+      alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
