@@ -118,18 +118,22 @@ import { QuoteLine } from '../../core/models/quote.model';
                       (change)="applyArticle(i)"
                       class="input"
                     >
-                      <option value="">Libre</option>
+                      <option value="" disabled>Sélectionner un article</option>
                       @for (article of articles(); track article.id) {
                         <option [value]="article.id">{{ article.name }}</option>
                       }
                     </select>
+                    <p class="text-xs text-gray-500 mt-1">
+                      Sélectionnez un article pour préremplir description, prix et TVA.
+                    </p>
                   </div>
                   <div class="md:col-span-5">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                     <input
                       type="text"
                       formControlName="description"
                       class="input"
+                      [ngClass]="{ 'border-red-500 focus:ring-red-500': isLineControlInvalid(i, 'description') }"
                       placeholder="Description du service/produit"
                     />
                     @if (isLineControlInvalid(i, 'description')) {
@@ -137,12 +141,13 @@ import { QuoteLine } from '../../core/models/quote.model';
                     }
                   </div>
                   <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantité *</label>
                     <input
                       type="number"
                       formControlName="quantity"
                       (input)="updateLineTotal(i)"
                       class="input w-20"
+                      [ngClass]="{ 'border-red-500 focus:ring-red-500': isLineControlInvalid(i, 'quantity') }"
                       min="1"
                     />
                     @if (isLineControlInvalid(i, 'quantity')) {
@@ -150,12 +155,13 @@ import { QuoteLine } from '../../core/models/quote.model';
                     }
                   </div>
                   <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire (MAD)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire (MAD) *</label>
                     <input
                       type="number"
                       formControlName="unitPrice"
                       (input)="updateLineTotal(i)"
                       class="input"
+                      [ngClass]="{ 'border-red-500 focus:ring-red-500': isLineControlInvalid(i, 'unitPrice') }"
                       min="0"
                     />
                     @if (isLineControlInvalid(i, 'unitPrice')) {
@@ -169,9 +175,13 @@ import { QuoteLine } from '../../core/models/quote.model';
                       formControlName="taxRate"
                       (input)="calculateTotals()"
                       class="input w-20"
+                      [ngClass]="{ 'border-red-500 focus:ring-red-500': isLineTaxRateMissing(i) }"
                       min="0"
                       max="100"
                     />
+                    @if (isLineTaxRateMissing(i)) {
+                      <p class="text-xs text-red-600 mt-1">Renseignez la TVA (0 si non applicable)</p>
+                    }
                   </div>
                   <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Total</label>
@@ -465,7 +475,16 @@ export class QuoteFormComponent implements OnInit {
   isLineControlInvalid(index: number, name: string): boolean {
     const line = this.lines.at(index);
     const control = line?.get(name);
-    return Boolean(control && control.invalid && control.touched);
+    const hasArticle = Boolean(line?.get('articleId')?.value);
+    return Boolean(control && control.invalid && (control.touched || hasArticle));
+  }
+
+  isLineTaxRateMissing(index: number): boolean {
+    const line = this.lines.at(index);
+    const hasArticle = Boolean(line?.get('articleId')?.value);
+    const value = line?.get('taxRate')?.value;
+    if (!hasArticle) return false;
+    return value === null || value === undefined || value === '';
   }
 
   areLinesValid(): boolean {
