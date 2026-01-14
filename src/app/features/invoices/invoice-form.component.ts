@@ -24,11 +24,29 @@ import { InvoiceLine } from '../../core/models/invoice.model';
           {{ clientsError() }}
         </div>
       }
+      @if (formError()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ formError() }}
+        </div>
+      }
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Numéro *</label>
+              <input
+                type="text"
+                formControlName="number"
+                class="input"
+                placeholder="Ex: FAC-2025-001"
+              />
+              @if (isControlInvalid('number')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              }
+            </div>
+
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Client *</label>
               <select formControlName="clientId" class="input">
@@ -42,7 +60,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                 }
               </select>
               @if (isControlInvalid('clientId')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -55,7 +73,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                 placeholder="Ex: Facture travaux octobre"
               />
               @if (isControlInvalid('title')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -63,7 +81,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
               <label class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
               <input type="date" formControlName="date" class="input" />
               @if (isControlInvalid('date')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -71,13 +89,14 @@ import { InvoiceLine } from '../../core/models/invoice.model';
               <label class="block text-sm font-medium text-gray-700 mb-2">Date d'échéance *</label>
               <input type="date" formControlName="dueDate" class="input" />
               @if (isControlInvalid('dueDate')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
               <select formControlName="status" class="input">
+                <option value="draft">Brouillon</option>
                 <option value="unpaid">Impayée</option>
                 <option value="partially_paid">Partiellement payée</option>
                 <option value="paid">Payée</option>
@@ -135,7 +154,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                       placeholder="Description du service/produit"
                     />
                     @if (isLineControlInvalid(i, 'description')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-1">
@@ -148,11 +167,11 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                       min="1"
                     />
                     @if (isLineControlInvalid(i, 'quantity')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire (MAD)</label>
                     <input
                       type="number"
                       formControlName="unitPrice"
@@ -161,7 +180,7 @@ import { InvoiceLine } from '../../core/models/invoice.model';
                       min="0"
                     />
                     @if (isLineControlInvalid(i, 'unitPrice')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-1">
@@ -248,6 +267,7 @@ export class InvoiceFormComponent implements OnInit {
   articles = this.articleService.articles;
   clientsLoading = signal(false);
   clientsError = signal('');
+  formError = signal('');
 
   form: FormGroup;
 
@@ -266,6 +286,7 @@ export class InvoiceFormComponent implements OnInit {
     private fb: FormBuilder
   ) {
     this.form = this.fb.group({
+      number: ['', Validators.required],
       clientId: ['', Validators.required],
       title: ['', Validators.required],
       date: [new Date().toISOString().split('T')[0], Validators.required],
@@ -290,7 +311,9 @@ export class InvoiceFormComponent implements OnInit {
     if (id) {
       this.isEdit.set(true);
       await this.loadInvoice(id);
+      this.form.get('number')?.disable({ emitEvent: false });
     } else {
+      await this.loadNextNumber();
       this.addLine();
     }
   }
@@ -298,6 +321,7 @@ export class InvoiceFormComponent implements OnInit {
   async loadInvoice(id: string) {
     const invoice = await this.invoiceService.getById(id);
     this.form.patchValue({
+      number: invoice.number,
       clientId: invoice.clientId,
       title: invoice.title,
       date: new Date(invoice.date).toISOString().split('T')[0],
@@ -330,6 +354,17 @@ export class InvoiceFormComponent implements OnInit {
       this.clientsError.set('Impossible de charger les clients');
     } finally {
       this.clientsLoading.set(false);
+    }
+  }
+
+  private async loadNextNumber() {
+    try {
+      const nextNumber = await this.invoiceService.getNextNumber();
+      if (nextNumber) {
+        this.form.patchValue({ number: nextNumber });
+      }
+    } catch {
+      this.formError.set('Impossible de générer le numéro de facture');
     }
   }
 
@@ -408,12 +443,15 @@ export class InvoiceFormComponent implements OnInit {
     if (this.form.invalid || !this.areLinesValid()) {
       this.form.markAllAsTouched();
       this.lines.markAllAsTouched();
-      alert('Veuillez remplir tous les champs obligatoires');
+      this.formError.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
+    this.formError.set('');
 
     const formValue = this.form.getRawValue();
     const invoiceData = {
+      number: formValue.number,
       clientId: formValue.clientId,
       title: formValue.title,
       note: formValue.notes,
@@ -431,7 +469,8 @@ export class InvoiceFormComponent implements OnInit {
     };
 
     if (this.isEdit()) {
-      await this.invoiceService.update(this.route.snapshot.paramMap.get('id')!, invoiceData);
+      const { number, ...updates } = invoiceData;
+      await this.invoiceService.update(this.route.snapshot.paramMap.get('id')!, updates);
     } else {
       await this.invoiceService.create(invoiceData as any);
     }

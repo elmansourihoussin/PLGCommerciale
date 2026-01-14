@@ -65,6 +65,14 @@ export const routes: Routes = [
     ]
   },
   {
+    path: 'errors/404',
+    loadComponent: () => import('./features/errors/error-404.component').then(m => m.Error404Component)
+  },
+  {
+    path: 'errors/503',
+    loadComponent: () => import('./features/errors/error-503.component').then(m => m.Error503Component)
+  },
+  {
     path: '',
     loadComponent: () => import('./shared/components/layout.component').then(m => m.LayoutComponent),
     canActivate: [authGuard],
@@ -87,6 +95,10 @@ export const routes: Routes = [
           {
             path: ':id/edit',
             loadComponent: () => import('./features/quotes/quote-form.component').then(m => m.QuoteFormComponent)
+          },
+          {
+            path: ':id',
+            loadComponent: () => import('./features/quotes/quote-detail.component').then(m => m.QuoteDetailComponent)
           }
         ]
       },
@@ -217,5 +229,9 @@ export const routes: Routes = [
     path: '',
     redirectTo: 'dashboard',
     pathMatch: 'full'
+  },
+  {
+    path: '**',
+    loadComponent: () => import('./features/errors/error-404.component').then(m => m.Error404Component)
   }
 ];

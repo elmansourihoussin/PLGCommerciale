@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InvoicePayment, InvoiceService, PaymentCreatePayload } from '../../core/services/invoice.service';
@@ -101,6 +101,7 @@ import { InvoicePayment, InvoiceService, PaymentCreatePayload } from '../../core
 })
 export class InvoicePaymentsComponent implements OnInit, OnChanges {
   @Input() invoiceId = '';
+  @Output() paymentsChanged = new EventEmitter<void>();
 
   payments = signal<InvoicePayment[]>([]);
   loading = signal(false);
@@ -160,6 +161,7 @@ export class InvoicePaymentsComponent implements OnInit, OnChanges {
       const payment = await this.invoiceService.addPayment(this.invoiceId, payload);
       this.payments.set([payment, ...this.payments()]);
       this.form = { amount: 0, method: '', paidAt: '', reference: '', note: '' };
+      this.paymentsChanged.emit();
     } catch (err) {
       this.error.set('Impossible d’ajouter le paiement');
     } finally {
@@ -175,6 +177,7 @@ export class InvoicePaymentsComponent implements OnInit, OnChanges {
     try {
       await this.invoiceService.removePayment(this.invoiceId, payment.id);
       this.payments.set(this.payments().filter((p) => p.id !== payment.id));
+      this.paymentsChanged.emit();
     } catch (err) {
       this.error.set('Impossible de supprimer le paiement');
     } finally {

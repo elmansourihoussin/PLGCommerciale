@@ -1,15 +1,18 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { QuoteService } from '../../core/services/quote.service';
+import { InvoiceService } from '../../core/services/invoice.service';
 import { Quote } from '../../core/models/quote.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { ConvertQuoteDialogComponent } from '../../shared/components/convert-quote-dialog.component';
+import { StatusDialogComponent, StatusOption } from '../../shared/components/status-dialog.component';
 
 @Component({
   selector: 'app-quote-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent, ConvertQuoteDialogComponent, StatusDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -76,12 +79,33 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
                     <td>{{ formatDate(quote.validUntil) }}</td>
                     <td class="font-semibold">{{ formatAmount(quote.total) }} MAD</td>
                     <td>
-                      <span [class]="getStatusBadgeClass(quote.status)">
-                        {{ getStatusLabel(quote.status) }}
-                      </span>
+                      <button
+                        type="button"
+                        class="cursor-pointer"
+                        (click)="openStatusModal(quote.id, quote.status)"
+                      >
+                        <span [class]="getStatusBadgeClass(quote.status)">
+                          {{ getStatusLabel(quote.status) }}
+                        </span>
+                      </button>
                     </td>
                     <td>
                       <div class="flex items-center space-x-3">
+                        <button
+                          (click)="openConvertDialog(quote.id)"
+                          class="text-emerald-600 hover:text-emerald-700"
+                          title="Créer une facture"
+                          [disabled]="convertingId() === quote.id"
+                        >
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
+                          </svg>
+                        </button>
+                        <button (click)="downloadPdf(quote.id)" class="text-gray-600 hover:text-gray-900" title="Télécharger PDF">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-3-3m3 3l3-3M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"/>
+                          </svg>
+                        </button>
                         <a [routerLink]="['/quotes', quote.id]" class="text-primary-600 hover:text-primary-700">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -146,6 +170,27 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         (cancel)="closeDeleteModal()"
         (confirm)="confirmDelete()"
       />
+
+      <app-convert-quote-dialog
+        [open]="showConvertModal()"
+        [busy]="convertBusy()"
+        [number]="convertNumber()"
+        [error]="convertError()"
+        (cancel)="closeConvertModal()"
+        (confirm)="confirmConvert($event)"
+      />
+
+      <app-status-dialog
+        [open]="showStatusModal()"
+        [busy]="statusBusy()"
+        [error]="statusError()"
+        [options]="statusOptions"
+        [currentValue]="statusCurrent()"
+        [currentLabel]="getStatusLabel(statusCurrent())"
+        title="Modifier le statut du devis"
+        (cancel)="closeStatusModal()"
+        (confirm)="confirmStatusChange($event)"
+      />
     </div>
   `
 })
@@ -154,12 +199,35 @@ export class QuoteListComponent implements OnInit {
   filterStatus = signal('');
   loading = signal(false);
   error = signal('');
+  convertingId = signal<string | null>(null);
+  showConvertModal = signal(false);
+  convertQuoteId = signal<string | null>(null);
+  convertNumber = signal('');
+  convertError = signal('');
+  convertBusy = signal(false);
+  showStatusModal = signal(false);
+  statusCurrent = signal<Quote['status'] | ''>('');
+  statusTargetId = signal<string | null>(null);
+  statusError = signal('');
+  statusBusy = signal(false);
   page = signal(1);
   pageSize = signal(10);
   showDeleteModal = signal(false);
   pendingDeleteId = signal<string | null>(null);
 
-  constructor(private quoteService: QuoteService) {}
+  statusOptions: StatusOption[] = [
+    { value: 'draft', label: 'Brouillon' },
+    { value: 'sent', label: 'Envoyé' },
+    { value: 'accepted', label: 'Accepté' },
+    { value: 'rejected', label: 'Rejeté' },
+    { value: 'expired', label: 'Expiré' }
+  ];
+
+  constructor(
+    private quoteService: QuoteService,
+    private invoiceService: InvoiceService,
+    private router: Router
+  ) {}
 
   async ngOnInit() {
     await this.loadQuotes();
@@ -186,6 +254,93 @@ export class QuoteListComponent implements OnInit {
   deleteQuote(id: string) {
     this.pendingDeleteId.set(id);
     this.showDeleteModal.set(true);
+  }
+
+  async openConvertDialog(id: string) {
+    this.convertError.set('');
+    this.convertQuoteId.set(id);
+    this.showConvertModal.set(true);
+    this.convertBusy.set(true);
+    this.convertingId.set(id);
+    try {
+      const nextNumber = await this.invoiceService.getNextNumber();
+      this.convertNumber.set(nextNumber || '');
+    } catch {
+      this.convertError.set('Impossible de générer le numéro de facture');
+    } finally {
+      this.convertBusy.set(false);
+    }
+  }
+
+  closeConvertModal() {
+    this.showConvertModal.set(false);
+    this.convertQuoteId.set(null);
+    this.convertNumber.set('');
+    this.convertError.set('');
+    this.convertingId.set(null);
+  }
+
+  async confirmConvert(number: string) {
+    const id = this.convertQuoteId();
+    if (!id) return;
+    this.convertBusy.set(true);
+    this.convertError.set('');
+    try {
+      const invoiceId = await this.quoteService.convertToInvoice(id, number);
+      if (invoiceId) {
+        this.closeConvertModal();
+        this.router.navigate(['/invoices', invoiceId, 'edit']);
+        return;
+      }
+      this.convertError.set('La conversion a réussi mais la facture est introuvable');
+    } catch {
+      this.convertError.set('Impossible de convertir le devis en facture');
+    } finally {
+      this.convertBusy.set(false);
+      this.convertingId.set(null);
+    }
+  }
+
+  openStatusModal(id: string, status: Quote['status']) {
+    this.statusTargetId.set(id);
+    this.statusCurrent.set(status);
+    this.statusError.set('');
+    this.showStatusModal.set(true);
+  }
+
+  closeStatusModal() {
+    this.showStatusModal.set(false);
+    this.statusTargetId.set(null);
+    this.statusCurrent.set('');
+    this.statusError.set('');
+    this.statusBusy.set(false);
+  }
+
+  async confirmStatusChange(status: string) {
+    const id = this.statusTargetId();
+    if (!id) return;
+    this.statusBusy.set(true);
+    this.statusError.set('');
+    try {
+      await this.quoteService.update(id, { status: status as Quote['status'] });
+      await this.loadQuotes();
+      this.closeStatusModal();
+    } catch {
+      this.statusError.set('Impossible de modifier le statut du devis');
+    } finally {
+      this.statusBusy.set(false);
+    }
+  }
+
+  async downloadPdf(id: string) {
+    try {
+      const blob = await this.quoteService.downloadPdf(id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      this.error.set('Impossible de télécharger le devis');
+    }
   }
 
   closeDeleteModal() {

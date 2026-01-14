@@ -6,6 +6,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { AuthService } from './auth.service';
 
 export interface CreateQuotePayload {
+  number?: string;
   clientId: string;
   title: string;
   note?: string;
@@ -53,6 +54,13 @@ interface QuotesListResponse {
     page?: number;
     limit?: number;
   };
+}
+
+interface ConvertQuoteResponse {
+  data?: { id?: string; invoiceId?: string } & Record<string, unknown>;
+  invoice?: { id?: string } & Record<string, unknown>;
+  id?: string;
+  invoiceId?: string;
 }
 
 @Injectable({
@@ -131,6 +139,21 @@ export class QuoteService {
       .then(() => {
         this.quotesSignal.update(quotes => quotes.filter(q => q.id !== id));
       });
+  }
+
+  convertToInvoice(id: string, number?: string): Promise<string | null> {
+    const url = `${this.configService.apiBaseUrl}/api/quotes/${encodeURIComponent(id)}/convert-to-invoice`;
+    const payload = number ? { number } : {};
+    return firstValueFrom(this.http.post<ConvertQuoteResponse>(url, payload, { headers: this.authHeaders() }))
+      .then((response) => {
+        const invoiceId = response.invoiceId ?? response.id ?? response.data?.invoiceId ?? response.data?.id ?? response.invoice?.id ?? null;
+        return invoiceId ?? null;
+      });
+  }
+
+  downloadPdf(quoteId: string): Promise<Blob> {
+    const url = `${this.configService.apiBaseUrl}/api/quotes/${encodeURIComponent(quoteId)}/pdf`;
+    return firstValueFrom(this.http.get(url, { headers: this.authHeaders(), responseType: 'blob' }));
   }
 
   private normalizeQuote(response: QuoteResponse | ApiQuote, fallback?: CreateQuotePayload): Quote {

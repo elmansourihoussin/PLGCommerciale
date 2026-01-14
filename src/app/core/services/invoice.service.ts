@@ -6,6 +6,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { AuthService } from './auth.service';
 
 export interface CreateInvoicePayload {
+  number?: string;
   clientId: string;
   title: string;
   note?: string;
@@ -244,6 +245,8 @@ export class InvoiceService {
     const subtotal = invoice.subtotal ?? lines.reduce((sum, line) => sum + line.total, 0);
     const taxAmount = invoice.taxAmount ?? subtotal * (defaultTaxRate / 100);
     const total = invoice.total ?? subtotal + taxAmount;
+    const rawStatus = (invoice.status ?? fallback?.status ?? 'unpaid') as string;
+    const normalizedStatus = rawStatus.toLowerCase() as Invoice['status'];
     return {
       id: invoice.id ?? Date.now().toString(),
       number: invoice.number ?? '',
@@ -263,7 +266,7 @@ export class InvoiceService {
       taxAmount,
       total,
       paidAmount: invoice.paidAmount ?? 0,
-      status: invoice.status ?? 'unpaid',
+      status: normalizedStatus,
       paymentMethod: invoice.paymentMethod as Invoice['paymentMethod'],
       notes: invoice.note ?? fallback?.note,
       createdAt: invoice.createdAt ? new Date(invoice.createdAt) : new Date(),

@@ -1,13 +1,13 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { PlatformTenantService } from '../../core/services/platform-tenant.service';
 
 @Component({
   selector: 'app-platform-tenant-create',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div>
@@ -21,50 +21,59 @@ import { PlatformTenantService } from '../../core/services/platform-tenant.servi
         </div>
       }
 
-      <form #tenantForm="ngForm" (ngSubmit)="onSubmit(tenantForm)" class="card space-y-4">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="card space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-          <input type="text" [(ngModel)]="name" name="name" class="input" required #nameRef="ngModel" />
-          @if (nameRef.invalid && nameRef.touched) {
-            <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+          <input type="text" formControlName="name" class="input" required />
+          @if (isControlRequired('name')) {
+            <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
           }
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-          <input type="email" [(ngModel)]="email" name="email" class="input" />
+          <input type="email" formControlName="email" class="input" />
+          @if (isControlError('email', 'email')) {
+            <p class="text-xs text-red-600 mt-1">Email invalide</p>
+          }
         </div>
         <div class="flex justify-end gap-3">
           <button type="button" class="btn-secondary" (click)="cancel()">Annuler</button>
-          <button type="submit" class="btn-primary" [disabled]="loading() || tenantForm.invalid">Créer</button>
+          <button type="submit" class="btn-primary" [disabled]="loading() || form.invalid">Créer</button>
         </div>
       </form>
     </div>
   `
 })
 export class PlatformTenantCreateComponent {
-  name = '';
-  email = '';
   loading = signal(false);
   error = signal('');
+  form: FormGroup;
 
   constructor(
     private platformTenantService: PlatformTenantService,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      name: ['', Validators.required],
+      email: ['', Validators.email]
+    });
+  }
 
-  async onSubmit(form: NgForm) {
-    if (form.invalid) {
-      form.form.markAllAsTouched();
-      this.error.set('Veuillez remplir tous les champs obligatoires');
-      alert('Veuillez remplir tous les champs obligatoires');
+  async onSubmit() {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.error.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
+
     this.loading.set(true);
     this.error.set('');
     try {
       const tenant = await this.platformTenantService.create({
-        name: this.name,
-        email: this.email || undefined
+        name: this.form.value.name,
+        email: this.form.value.email || undefined
       });
       this.router.navigate(['/platform/tenants', tenant.id]);
     } catch {
@@ -72,6 +81,16 @@ export class PlatformTenantCreateComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  isControlRequired(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError('required'));
+  }
+
+  isControlError(name: string, error: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError(error));
   }
 
   cancel() {

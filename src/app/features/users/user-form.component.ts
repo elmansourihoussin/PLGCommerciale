@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UserService, CreateUserPayload, UpdateUserPayload } from '../../core/services/user.service';
 import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../core/models/user.model';
@@ -9,7 +9,7 @@ import { User } from '../../core/models/user.model';
 @Component({
   selector: 'app-user-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -24,41 +24,43 @@ import { User } from '../../core/models/user.model';
         </div>
       }
 
-      <form #userForm="ngForm" (ngSubmit)="onSubmit(userForm)" class="space-y-6">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-              <input type="text" [(ngModel)]="formData.fullName" name="fullName" class="input" required #fullNameRef="ngModel" />
-              @if (fullNameRef.invalid && fullNameRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              <input type="text" formControlName="fullName" class="input" required />
+              @if (isControlRequired('fullName')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-              <input type="email" [(ngModel)]="formData.email" name="email" class="input" required #emailRef="ngModel" />
-              @if (emailRef.invalid && emailRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              <input type="email" formControlName="email" class="input" required />
+              @if (isControlRequired('email')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (isControlError('email', 'email')) {
+                <p class="text-xs text-red-600 mt-1">Email invalide</p>
               }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Rôle *</label>
-              <select [(ngModel)]="formData.role" name="role" class="input" required #roleRef="ngModel">
+              <select formControlName="role" class="input" required>
                 <option value="OWNER">Super administrateur</option>
                 <option value="ADMIN">Administrateur</option>
                 <option value="AGENT">Gestionnaire</option>
               </select>
-              @if (roleRef.invalid && roleRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('role')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
             @if (!isEdit()) {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
-                <input type="password" [(ngModel)]="formData.password" name="password" class="input" required #passwordRef="ngModel" />
-                @if (passwordRef.invalid && passwordRef.touched) {
-                  <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <input type="password" formControlName="password" class="input" required />
+                @if (isControlRequired('password')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                 }
               </div>
             }
@@ -67,7 +69,7 @@ import { User } from '../../core/models/user.model';
 
         <div class="flex justify-end space-x-4">
           <button type="button" (click)="goBack()" class="btn-secondary">Annuler</button>
-          <button type="submit" class="btn-primary" [disabled]="loading() || userForm.invalid">
+          <button type="submit" class="btn-primary" [disabled]="loading() || form.invalid">
             {{ isEdit() ? 'Enregistrer' : 'Créer' }}
           </button>
         </div>
@@ -84,25 +86,33 @@ export class UserFormComponent implements OnInit {
     return role === 'owner' || role === 'admin';
   });
 
-  formData: CreateUserPayload = {
-    fullName: '',
-    email: '',
-    role: 'AGENT',
-    password: ''
-  };
+  form: FormGroup;
 
   constructor(
     private userService: UserService,
     private authService: AuthService,
     private route: ActivatedRoute,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      fullName: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      role: ['AGENT', Validators.required],
+      password: ['']
+    });
+  }
 
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
+      this.form.get('password')?.clearValidators();
+      this.form.get('password')?.updateValueAndValidity();
       await this.loadUser(id);
+    } else {
+      this.form.get('password')?.setValidators(Validators.required);
+      this.form.get('password')?.updateValueAndValidity();
     }
   }
 
@@ -116,49 +126,59 @@ export class UserFormComponent implements OnInit {
         this.error.set('Utilisateur introuvable');
         return;
       }
-      this.formData = {
+      this.form.patchValue({
         fullName: user.name,
         email: user.email,
-        role: this.mapRoleToApi(user.role),
-        password: ''
-      };
-    } catch (err) {
+        role: this.mapRoleToApi(user.role)
+      });
+    } catch {
       this.error.set('Impossible de charger l’utilisateur');
     } finally {
       this.loading.set(false);
     }
   }
 
-  async onSubmit(form: NgForm) {
+  async onSubmit() {
     if (!this.isAdmin()) {
       this.error.set('Action non autorisée');
       return;
     }
-    if (form.invalid) {
-      form.form.markAllAsTouched();
-      this.error.set('Veuillez remplir tous les champs obligatoires');
-      alert('Veuillez remplir tous les champs obligatoires');
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.error.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
+
     this.loading.set(true);
     this.error.set('');
     try {
       if (this.isEdit()) {
         const payload: UpdateUserPayload = {
-          fullName: this.formData.fullName,
-          email: this.formData.email,
-          role: this.formData.role
+          fullName: this.form.value.fullName,
+          email: this.form.value.email,
+          role: this.form.value.role
         };
         await this.userService.update(this.route.snapshot.paramMap.get('id')!, payload);
       } else {
-        await this.userService.create(this.formData);
+        await this.userService.create(this.form.value as CreateUserPayload);
       }
       this.router.navigate(['/users']);
-    } catch (err) {
+    } catch {
       this.error.set('Impossible d’enregistrer l’utilisateur');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  isControlRequired(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError('required'));
+  }
+
+  isControlError(name: string, error: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError(error));
   }
 
   mapRoleToApi(role: User['role']): CreateUserPayload['role'] {

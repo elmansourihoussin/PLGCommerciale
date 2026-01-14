@@ -10,7 +10,12 @@ export const httpAuthInterceptor: HttpInterceptorFn = (
   const authService = inject(AuthService);
   const token = authService.accessToken();
 
+  const url = request.url;
   if (!token || request.headers.has('Authorization')) {
+    return next(request);
+  }
+
+  if (url.includes('/api/auth/login') || url.includes('/api/auth/register') || url.includes('/api/auth/refresh') || url.includes('/api/platform/')) {
     return next(request);
   }
 

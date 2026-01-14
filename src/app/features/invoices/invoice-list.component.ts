@@ -3,12 +3,14 @@ import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InvoiceService } from '../../core/services/invoice.service';
+import type { Invoice } from '../../core/models/invoice.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { StatusDialogComponent, StatusOption } from '../../shared/components/status-dialog.component';
 
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent, StatusDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -63,6 +65,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
           </div>
           <select [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()" class="input sm:w-48">
             <option value="">Tous les statuts</option>
+            <option value="draft">Brouillon</option>
             <option value="paid">Payée</option>
             <option value="unpaid">Impayée</option>
             <option value="partially_paid">Partiellement payée</option>
@@ -101,9 +104,15 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
                     <td>{{ formatAmount(invoice.paidAmount) }} MAD</td>
                     <td>{{ formatAmount(getBalanceDue(invoice)) }} MAD</td>
                     <td>
-                      <span [class]="getStatusBadgeClass(invoice.status)">
-                        {{ getStatusLabel(invoice.status) }}
-                      </span>
+                      <button
+                        type="button"
+                        class="cursor-pointer"
+                        (click)="openStatusModal(invoice.id, invoice.status)"
+                      >
+                        <span [class]="getStatusBadgeClass(invoice.status)">
+                          {{ getStatusLabel(invoice.status) }}
+                        </span>
+                      </button>
                     </td>
                     <td>
                       <div class="flex items-center space-x-3">
@@ -182,6 +191,18 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         (cancel)="closeDeleteModal()"
         (confirm)="confirmDelete()"
       />
+
+      <app-status-dialog
+        [open]="showStatusModal()"
+        [busy]="statusBusy()"
+        [error]="statusError()"
+        [options]="statusOptions"
+        [currentValue]="statusCurrent()"
+        [currentLabel]="getStatusLabel(statusCurrent())"
+        title="Modifier le statut de la facture"
+        (cancel)="closeStatusModal()"
+        (confirm)="confirmStatusChange($event)"
+      />
     </div>
   `
 })
@@ -190,10 +211,23 @@ export class InvoiceListComponent implements OnInit {
   filterStatus = signal('');
   loading = signal(false);
   error = signal('');
+  showStatusModal = signal(false);
+  statusCurrent = signal<Invoice['status'] | ''>('');
+  statusTargetId = signal<string | null>(null);
+  statusError = signal('');
+  statusBusy = signal(false);
   page = signal(1);
   pageSize = signal(10);
   showDeleteModal = signal(false);
   pendingDeleteId = signal<string | null>(null);
+
+  statusOptions: StatusOption[] = [
+    { value: 'draft', label: 'Brouillon' },
+    { value: 'paid', label: 'Payée' },
+    { value: 'unpaid', label: 'Impayée' },
+    { value: 'partially_paid', label: 'Partiellement payée' },
+    { value: 'overdue', label: 'En retard' }
+  ];
 
   constructor(private invoiceService: InvoiceService) {}
 
@@ -290,8 +324,40 @@ export class InvoiceListComponent implements OnInit {
     });
   }
 
+  openStatusModal(id: string, status: Invoice['status']) {
+    this.statusTargetId.set(id);
+    this.statusCurrent.set(status);
+    this.statusError.set('');
+    this.showStatusModal.set(true);
+  }
+
+  closeStatusModal() {
+    this.showStatusModal.set(false);
+    this.statusTargetId.set(null);
+    this.statusCurrent.set('');
+    this.statusError.set('');
+    this.statusBusy.set(false);
+  }
+
+  async confirmStatusChange(status: string) {
+    const id = this.statusTargetId();
+    if (!id) return;
+    this.statusBusy.set(true);
+    this.statusError.set('');
+    try {
+      await this.invoiceService.update(id, { status: status as Invoice['status'] });
+      await this.loadInvoices();
+      this.closeStatusModal();
+    } catch {
+      this.statusError.set('Impossible de modifier le statut de la facture');
+    } finally {
+      this.statusBusy.set(false);
+    }
+  }
+
   getStatusBadgeClass(status: string): string {
     const classes: Record<string, string> = {
+      draft: 'badge-info',
       paid: 'badge-success',
       unpaid: 'badge-warning',
       partially_paid: 'badge-info',
@@ -302,6 +368,7 @@ export class InvoiceListComponent implements OnInit {
 
   getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
+      draft: 'Brouillon',
       paid: 'Payée',
       unpaid: 'Impayée',
       partially_paid: 'Part. payée',

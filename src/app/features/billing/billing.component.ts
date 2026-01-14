@@ -45,7 +45,8 @@ import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../co
         <div class="card hover:shadow-lg transition-shadow">
           <div class="text-center">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Gratuit</h3>
-            <div class="text-3xl font-bold text-gray-900 mb-4">0 MAD</div>
+            <div class="text-3xl font-bold text-gray-900 mb-1">0 MAD</div>
+            <div class="text-sm text-gray-500 mb-4">par mois</div>
             <ul class="space-y-3 text-sm text-gray-600 mb-6">
               <li class="flex items-center">
                 <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,7 +81,8 @@ import { BillingService, Subscription, SubscriptionHistoryEntry } from '../../co
           </div>
           <div class="text-center">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Pro</h3>
-            <div class="text-3xl font-bold text-gray-900 mb-4">199 MAD</div>
+            <div class="text-3xl font-bold text-gray-900 mb-1">199 MAD</div>
+            <div class="text-sm text-gray-500 mb-4">par mois</div>
             <ul class="space-y-3 text-sm text-gray-600 mb-6">
               <li class="flex items-center">
                 <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

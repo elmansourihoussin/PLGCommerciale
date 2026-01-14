@@ -45,6 +45,8 @@ export class AuthService {
   currentUser = this.currentUserSignal.asReadonly();
   private accessTokenSignal = signal<string | null>(null);
   accessToken = this.accessTokenSignal.asReadonly();
+  private refreshTokenSignal = signal<string | null>(null);
+  refreshToken = this.refreshTokenSignal.asReadonly();
 
   constructor(
     private http: HttpClient,
@@ -59,6 +61,7 @@ export class AuthService {
       this.currentUserSignal.set(JSON.parse(userJson));
     }
     this.accessTokenSignal.set(localStorage.getItem(ACCESS_TOKEN_KEY));
+    this.refreshTokenSignal.set(localStorage.getItem(REFRESH_TOKEN_KEY));
   }
 
   login(email: string, password: string): Promise<User> {
@@ -126,7 +129,25 @@ export class AuthService {
 
   private persistTokens(accessToken: string, refreshToken: string) {
     this.accessTokenSignal.set(accessToken);
+    this.refreshTokenSignal.set(refreshToken);
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = this.refreshTokenSignal();
+    if (!refreshToken) return null;
+    const url = `${this.configService.apiBaseUrl}/api/auth/refresh`;
+    const response = await firstValueFrom(
+      this.http.post<{ data?: { accessToken?: string; refreshToken?: string }; accessToken?: string; refreshToken?: string }>(
+        url,
+        { refreshToken }
+      )
+    );
+    const accessToken = response.data?.accessToken ?? response.accessToken ?? null;
+    const newRefreshToken = response.data?.refreshToken ?? response.refreshToken ?? null;
+    if (!accessToken || !newRefreshToken) return null;
+    this.persistTokens(accessToken, newRefreshToken);
+    return accessToken;
   }
 }

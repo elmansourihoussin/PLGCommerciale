@@ -1,13 +1,13 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ClientService } from '../../core/services/client.service';
 
 @Component({
   selector: 'app-client-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between">
@@ -16,7 +16,7 @@ import { ClientService } from '../../core/services/client.service';
         </h1>
       </div>
 
-      <form #clientForm="ngForm" (ngSubmit)="onSubmit(clientForm)" class="space-y-6">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         @if (error()) {
           <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {{ error() }}
@@ -29,15 +29,12 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
               <input
                 type="text"
-                [(ngModel)]="formData.name"
-                name="name"
-                required
-                #nameRef="ngModel"
+                formControlName="name"
                 class="input"
                 placeholder="Hassan Bennani"
               />
-              @if (nameRef.invalid && nameRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('name')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -45,15 +42,14 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
               <input
                 type="email"
-                [(ngModel)]="formData.email"
-                name="email"
-                required
-                #emailRef="ngModel"
+                formControlName="email"
                 class="input"
                 placeholder="hassan@example.com"
               />
-              @if (emailRef.invalid && emailRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('email')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (isControlError('email', 'email')) {
+                <p class="text-xs text-red-600 mt-1">Email invalide</p>
               }
             </div>
 
@@ -61,15 +57,14 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
               <input
                 type="tel"
-                [(ngModel)]="formData.phone"
-                name="phone"
-                required
-                #phoneRef="ngModel"
+                formControlName="phone"
                 class="input"
                 placeholder="+212 6 12 34 56 78"
               />
-              @if (phoneRef.invalid && phoneRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('phone')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (isControlError('phone', 'pattern')) {
+                <p class="text-xs text-red-600 mt-1">Téléphone invalide (format marocain)</p>
               }
             </div>
 
@@ -77,15 +72,12 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Adresse *</label>
               <input
                 type="text"
-                [(ngModel)]="formData.address"
-                name="address"
-                required
-                #addressRef="ngModel"
+                formControlName="address"
                 class="input"
                 placeholder="12 Rue Mohammed V, Casablanca"
               />
-              @if (addressRef.invalid && addressRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('address')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -93,15 +85,12 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Ville *</label>
               <input
                 type="text"
-                [(ngModel)]="formData.city"
-                name="city"
-                required
-                #cityRef="ngModel"
+                formControlName="city"
                 class="input"
                 placeholder="Casablanca"
               />
-              @if (cityRef.invalid && cityRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('city')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -109,11 +98,13 @@ import { ClientService } from '../../core/services/client.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">ICE</label>
               <input
                 type="text"
-                [(ngModel)]="formData.ice"
-                name="ice"
+                formControlName="ice"
                 class="input"
                 placeholder="000123456000001"
               />
+              @if (isControlError('ice', 'pattern')) {
+                <p class="text-xs text-red-600 mt-1">ICE invalide (15 chiffres)</p>
+              }
             </div>
           </div>
         </div>
@@ -122,7 +113,7 @@ import { ClientService } from '../../core/services/client.service';
           <button type="button" (click)="goBack()" class="btn-secondary">
             Annuler
           </button>
-          <button type="submit" class="btn-primary" [disabled]="loading() || clientForm.invalid">
+          <button type="submit" class="btn-primary" [disabled]="loading() || form.invalid">
             @if (loading()) {
               <span>Enregistrement...</span>
             } @else {
@@ -139,27 +130,26 @@ export class ClientFormComponent implements OnInit {
   loading = signal(false);
   error = signal('');
 
-  formData: {
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    ice?: string;
-  } = {
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    ice: ''
-  };
+  form: FormGroup;
+
+  private phonePattern = /^(?:\+212|0)[5-7]\d{8}$/;
+  private icePattern = /^\d{15}$/;
 
   constructor(
     private clientService: ClientService,
     private route: ActivatedRoute,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      name: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      phone: ['', [Validators.required, Validators.pattern(this.phonePattern)]],
+      address: ['', Validators.required],
+      city: ['', Validators.required],
+      ice: ['', Validators.pattern(this.icePattern)]
+    });
+  }
 
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
@@ -174,20 +164,26 @@ export class ClientFormComponent implements OnInit {
     this.error.set('');
     try {
       const client = await this.clientService.getById(id);
-      const { name, email, phone, address, city, ice } = client;
-      this.formData = { name, email, phone, address, city, ice };
-    } catch (err) {
+      this.form.patchValue({
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        address: client.address,
+        city: client.city,
+        ice: client.ice ?? ''
+      });
+    } catch {
       this.error.set('Impossible de charger le client');
     } finally {
       this.loading.set(false);
     }
   }
 
-  async onSubmit(form: NgForm) {
-    if (form.invalid) {
-      form.form.markAllAsTouched();
-      this.error.set('Veuillez remplir tous les champs obligatoires');
-      alert('Veuillez remplir tous les champs obligatoires');
+  async onSubmit() {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.error.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
 
@@ -195,16 +191,26 @@ export class ClientFormComponent implements OnInit {
     this.error.set('');
     try {
       if (this.isEdit()) {
-        await this.clientService.update(this.route.snapshot.paramMap.get('id')!, this.formData);
+        await this.clientService.update(this.route.snapshot.paramMap.get('id')!, this.form.value);
       } else {
-        await this.clientService.create(this.formData);
+        await this.clientService.create(this.form.value);
       }
       this.router.navigate(['/clients']);
-    } catch (err) {
+    } catch {
       this.error.set(this.isEdit() ? 'Impossible de mettre à jour le client' : 'Impossible de créer le client');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  isControlRequired(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError('required'));
+  }
+
+  isControlError(name: string, error: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError(error));
   }
 
   goBack() {

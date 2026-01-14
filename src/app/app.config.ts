@@ -6,11 +6,12 @@ import { AppConfigService } from './core/config/app-config.service';
 import { httpAuthInterceptor } from './core/http-auth.interceptor';
 import { httpPlatformAuthInterceptor } from './core/http-platform-auth.interceptor';
 import { httpErrorInterceptor } from './core/http-error.interceptor';
+import { httpRefreshInterceptor } from './core/http-refresh.interceptor';
 
 export const appConfig: ApplicationConfig = {
     providers: [
         provideRouter(routes),
-        provideHttpClient(withInterceptors([httpPlatformAuthInterceptor, httpAuthInterceptor, httpErrorInterceptor])),
+        provideHttpClient(withInterceptors([httpPlatformAuthInterceptor, httpAuthInterceptor, httpErrorInterceptor, httpRefreshInterceptor])),
         {
             provide: APP_INITIALIZER,
             multi: true,

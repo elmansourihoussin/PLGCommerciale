@@ -6,11 +6,12 @@ import { CheckService } from '../../core/services/check.service';
 import { ClientService } from '../../core/services/client.service';
 import { CheckStatus } from '../../core/models/check.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
+import { StatusDialogComponent, StatusOption } from '../../shared/components/status-dialog.component';
 
 @Component({
   selector: 'app-check-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ConfirmDialogComponent, StatusDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -83,9 +84,15 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
                   <td>{{ formatDate(check.dueDate) }}</td>
                   <td class="font-semibold">{{ check.amount.toLocaleString() }} MAD</td>
                   <td>
-                    <span [class]="getStatusBadgeClass(check.status)">
-                      {{ getStatusLabel(check.status) }}
-                    </span>
+                    <button
+                      type="button"
+                      class="cursor-pointer"
+                      (click)="openStatusModal(check.id, check.status)"
+                    >
+                      <span [class]="getStatusBadgeClass(check.status)">
+                        {{ getStatusLabel(check.status) }}
+                      </span>
+                    </button>
                   </td>
                   <td>
                     <div class="flex items-center space-x-3">
@@ -147,6 +154,18 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         (cancel)="closeDeleteModal()"
         (confirm)="confirmDelete()"
       />
+
+      <app-status-dialog
+        [open]="showStatusModal()"
+        [busy]="statusBusy()"
+        [error]="statusError()"
+        [options]="statusOptions"
+        [currentValue]="statusCurrent()"
+        [currentLabel]="getStatusLabel(statusCurrent())"
+        title="Modifier le statut du chèque"
+        (cancel)="closeStatusModal()"
+        (confirm)="confirmStatusChange($event)"
+      />
     </div>
   `
 })
@@ -155,6 +174,11 @@ export class CheckListComponent implements OnInit {
   clients = this.clientService.clients;
   loading = signal(false);
   error = signal('');
+  showStatusModal = signal(false);
+  statusCurrent = signal<CheckStatus | ''>('');
+  statusTargetId = signal<string | null>(null);
+  statusError = signal('');
+  statusBusy = signal(false);
   filterStatus = signal<CheckStatus | ''>('');
   filterClientId = signal('');
   page = signal(1);
@@ -166,6 +190,11 @@ export class CheckListComponent implements OnInit {
     CASHED: 0,
     CANCELLED: 0
   });
+  statusOptions: StatusOption[] = [
+    { value: 'PENDING', label: 'En attente' },
+    { value: 'CASHED', label: 'Encaissé' },
+    { value: 'CANCELLED', label: 'Annulé' }
+  ];
 
   constructor(
     private checkService: CheckService,
@@ -229,6 +258,38 @@ export class CheckListComponent implements OnInit {
     }).catch(() => {
       this.error.set('Impossible de supprimer le chèque');
     });
+  }
+
+  openStatusModal(id: string, status: CheckStatus) {
+    this.statusTargetId.set(id);
+    this.statusCurrent.set(status);
+    this.statusError.set('');
+    this.showStatusModal.set(true);
+  }
+
+  closeStatusModal() {
+    this.showStatusModal.set(false);
+    this.statusTargetId.set(null);
+    this.statusCurrent.set('');
+    this.statusError.set('');
+    this.statusBusy.set(false);
+  }
+
+  async confirmStatusChange(status: string) {
+    const id = this.statusTargetId();
+    if (!id) return;
+    this.statusBusy.set(true);
+    this.statusError.set('');
+    try {
+      await this.checkService.update(id, { status: status as CheckStatus });
+      await this.loadChecks();
+      await this.loadStatusCounts();
+      this.closeStatusModal();
+    } catch {
+      this.statusError.set('Impossible de modifier le statut du chèque');
+    } finally {
+      this.statusBusy.set(false);
+    }
   }
 
   totalPages = computed(() => {

@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { PlatformTenantService } from '../../core/services/platform-tenant.service';
 import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/platform-tenant.model';
@@ -8,7 +8,7 @@ import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/pl
 @Component({
   selector: 'app-platform-tenant-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -52,22 +52,22 @@ import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/pl
 
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Abonnement</h2>
-          <form #subscriptionForm="ngForm" (ngSubmit)="updateSubscription(subscriptionForm)" class="space-y-4">
+          <form [formGroup]="subscriptionForm" (ngSubmit)="updateSubscription()" class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-              <input type="text" [(ngModel)]="subscriptionPlan" class="input" placeholder="PRO" required #planRef="ngModel" />
-              @if (planRef.invalid && planRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              <input type="text" formControlName="plan" class="input" placeholder="PRO" />
+              @if (isSubscriptionInvalid('plan')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-              <input type="text" [(ngModel)]="subscriptionStatus" class="input" placeholder="ACTIVE" required #statusRef="ngModel" />
-              @if (statusRef.invalid && statusRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              <input type="text" formControlName="status" class="input" placeholder="ACTIVE" />
+              @if (isSubscriptionInvalid('status')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
-            <button type="submit" class="btn-primary w-full" [disabled]="loading() || !isSubscriptionFormValid()">
+            <button type="submit" class="btn-primary w-full" [disabled]="loading() || subscriptionForm.invalid">
               Mettre à jour
             </button>
           </form>
@@ -120,13 +120,19 @@ export class PlatformTenantDetailComponent implements OnInit {
   loading = signal(false);
   historyLoading = signal(false);
   error = signal('');
-  subscriptionPlan = '';
-  subscriptionStatus = '';
+
+  subscriptionForm: FormGroup;
 
   constructor(
     private platformTenantService: PlatformTenantService,
-    private route: ActivatedRoute
-  ) {}
+    private route: ActivatedRoute,
+    private fb: FormBuilder
+  ) {
+    this.subscriptionForm = this.fb.group({
+      plan: ['', Validators.required],
+      status: ['', Validators.required]
+    });
+  }
 
   async ngOnInit() {
     await this.loadTenant();
@@ -141,8 +147,10 @@ export class PlatformTenantDetailComponent implements OnInit {
       if (!id) return;
       const tenant = await this.platformTenantService.getById(id);
       this.tenant.set(tenant);
-      this.subscriptionPlan = tenant.subscription?.plan ?? '';
-      this.subscriptionStatus = tenant.subscription?.status ?? '';
+      this.subscriptionForm.patchValue({
+        plan: tenant.subscription?.plan ?? '',
+        status: tenant.subscription?.status ?? ''
+      });
     } catch {
       this.error.set('Impossible de charger l’entreprise');
     } finally {
@@ -164,20 +172,20 @@ export class PlatformTenantDetailComponent implements OnInit {
     }
   }
 
-  async updateSubscription(form?: NgForm) {
+  async updateSubscription() {
     const tenant = this.tenant();
     if (!tenant) return;
-    if (form?.invalid) {
-      form.form.markAllAsTouched();
-      this.error.set('Veuillez remplir tous les champs obligatoires');
-      alert('Veuillez remplir tous les champs obligatoires');
+    if (this.subscriptionForm.invalid) {
+      this.subscriptionForm.markAllAsTouched();
+      this.error.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
     this.loading.set(true);
     try {
       const updated = await this.platformTenantService.updateSubscription(tenant.id, {
-        plan: this.subscriptionPlan || undefined,
-        status: this.subscriptionStatus || undefined
+        plan: this.subscriptionForm.value.plan,
+        status: this.subscriptionForm.value.status
       });
       this.tenant.set(updated);
       await this.loadHistory();
@@ -205,15 +213,16 @@ export class PlatformTenantDetailComponent implements OnInit {
     }
   }
 
+  isSubscriptionInvalid(name: string): boolean {
+    const control = this.subscriptionForm.get(name);
+    return Boolean(control && control.touched && control.hasError('required'));
+  }
+
   formatDate(date?: Date): string {
     if (!date) return '—';
     return new Intl.DateTimeFormat('fr-FR', {
       dateStyle: 'medium',
       timeStyle: 'short'
     }).format(date);
-  }
-
-  isSubscriptionFormValid(): boolean {
-    return Boolean(this.subscriptionPlan?.trim()) && Boolean(this.subscriptionStatus?.trim());
   }
 }

@@ -1,13 +1,13 @@
 import { Component, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormsModule, NgForm } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <div class="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div class="max-w-md w-full">
@@ -17,7 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <div class="card">
-          <form #registerForm="ngForm" (ngSubmit)="onSubmit(registerForm)" class="space-y-6">
+          <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
             @if (error()) {
               <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {{ error() }}
@@ -28,15 +28,12 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
               <input
                 type="text"
-                [(ngModel)]="companyName"
-                name="companyName"
-                required
-                #companyNameRef="ngModel"
+                formControlName="companyName"
                 class="input"
                 placeholder="Atelier Atlas"
               />
-              @if (companyNameRef.invalid && companyNameRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('companyName')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -44,15 +41,14 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
               <input
                 type="tel"
-                [(ngModel)]="phone"
-                name="phone"
-                required
-                #phoneRef="ngModel"
+                formControlName="phone"
                 class="input"
                 placeholder="0600000000"
               />
-              @if (phoneRef.invalid && phoneRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('phone')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (isControlError('phone', 'pattern')) {
+                <p class="text-xs text-red-600 mt-1">Téléphone invalide (format marocain)</p>
               }
             </div>
 
@@ -60,15 +56,14 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Email de l'entreprise</label>
               <input
                 type="email"
-                [(ngModel)]="companyEmail"
-                name="companyEmail"
-                required
-                #companyEmailRef="ngModel"
+                formControlName="companyEmail"
                 class="input"
                 placeholder="contact@atlas.ma"
               />
-              @if (companyEmailRef.invalid && companyEmailRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('companyEmail')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (isControlError('companyEmail', 'email')) {
+                <p class="text-xs text-red-600 mt-1">Email invalide</p>
               }
             </div>
 
@@ -76,15 +71,12 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
               <input
                 type="text"
-                [(ngModel)]="fullName"
-                name="fullName"
-                required
-                #fullNameRef="ngModel"
+                formControlName="fullName"
                 class="input"
                 placeholder="Owner Atlas"
               />
-              @if (fullNameRef.invalid && fullNameRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('fullName')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -92,15 +84,12 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
               <input
                 type="password"
-                [(ngModel)]="password"
-                name="password"
-                required
-                #passwordRef="ngModel"
+                formControlName="password"
                 class="input"
                 placeholder="••••••••"
               />
-              @if (passwordRef.invalid && passwordRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+              @if (isControlRequired('password')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -108,23 +97,20 @@ import { AuthService } from '../../core/services/auth.service';
               <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
               <input
                 type="password"
-                [(ngModel)]="confirmPassword"
-                name="confirmPassword"
-                required
-                #confirmPasswordRef="ngModel"
+                formControlName="confirmPassword"
                 class="input"
                 placeholder="••••••••"
               />
-              @if (confirmPasswordRef.invalid && confirmPasswordRef.touched) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
-              } @else if (confirmPasswordRef.touched && confirmPassword && password && confirmPassword !== password) {
+              @if (isControlRequired('confirmPassword')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              } @else if (form.get('confirmPassword')?.touched && form.get('confirmPassword')?.value && form.get('password')?.value && form.get('confirmPassword')?.value !== form.get('password')?.value) {
                 <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
               }
             </div>
 
             <button
               type="submit"
-              [disabled]="loading() || registerForm.invalid || !passwordsMatch()"
+              [disabled]="loading() || form.invalid || !passwordsMatch()"
               class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               @if (loading()) {
@@ -147,39 +133,31 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class RegisterComponent {
-  companyName = '';
-  phone = '';
-  companyEmail = '';
-  fullName = '';
-  password = '';
-  confirmPassword = '';
   loading = signal(false);
   error = signal('');
+  form: FormGroup;
+  private phonePattern = /^(?:\+212|0)[5-7]\d{8}$/;
 
   constructor(
     private authService: AuthService,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      companyName: ['', Validators.required],
+      phone: ['', [Validators.required, Validators.pattern(this.phonePattern)]],
+      companyEmail: ['', [Validators.required, Validators.email]],
+      fullName: ['', Validators.required],
+      password: ['', [Validators.required, Validators.minLength(6)]],
+      confirmPassword: ['', Validators.required]
+    });
+  }
 
-  async onSubmit(form: NgForm) {
-    if (form.invalid) {
-      form.form.markAllAsTouched();
-      this.error.set('Veuillez remplir tous les champs obligatoires');
-      alert('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-    if (!this.companyName || !this.phone || !this.companyEmail || !this.fullName || !this.password || !this.confirmPassword) {
-      this.error.set('Veuillez remplir tous les champs');
-      return;
-    }
-
-    if (this.password !== this.confirmPassword) {
-      this.error.set('Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (this.password.length < 6) {
-      this.error.set('Le mot de passe doit contenir au moins 6 caractères');
+  async onSubmit() {
+    if (this.form.invalid || !this.passwordsMatch()) {
+      this.form.markAllAsTouched();
+      this.error.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
 
@@ -187,22 +165,33 @@ export class RegisterComponent {
     this.error.set('');
 
     try {
+      const formValue = this.form.value;
       await this.authService.register({
-        companyName: this.companyName,
-        phone: this.phone,
-        companyEmail: this.companyEmail,
-        password: this.password,
-        fullName: this.fullName
+        companyName: formValue.companyName,
+        phone: formValue.phone,
+        companyEmail: formValue.companyEmail,
+        password: formValue.password,
+        fullName: formValue.fullName
       });
       this.router.navigate(['/dashboard']);
-    } catch (err) {
+    } catch {
       this.error.set('Une erreur est survenue lors de la création du compte');
     } finally {
       this.loading.set(false);
     }
   }
 
+  isControlRequired(name: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError('required'));
+  }
+
+  isControlError(name: string, error: string): boolean {
+    const control = this.form.get(name);
+    return Boolean(control && control.touched && control.hasError(error));
+  }
+
   passwordsMatch(): boolean {
-    return Boolean(this.password) && this.password === this.confirmPassword;
+    return Boolean(this.form.get('password')?.value) && this.form.get('password')?.value === this.form.get('confirmPassword')?.value;
   }
 }

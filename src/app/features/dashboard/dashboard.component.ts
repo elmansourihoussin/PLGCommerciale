@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { DashboardService, DashboardOverview } from '../../core/services/dashboard.service';
+import { DashboardService, DashboardOverview, RevenueByMonthEntry } from '../../core/services/dashboard.service';
 import { QuoteService } from '../../core/services/quote.service';
 import { InvoiceService } from '../../core/services/invoice.service';
 import { ClientService } from '../../core/services/client.service';
@@ -105,18 +105,60 @@ import { ClientService } from '../../core/services/client.service';
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="card">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Revenus mensuels</h2>
-          <div class="h-64 flex items-end justify-between space-x-2">
-            @for (month of monthlyRevenue(); track month.name) {
-              <div class="flex-1 flex flex-col items-center">
-                <div
-                  class="w-full bg-primary-500 rounded-t hover:bg-primary-600 transition-colors cursor-pointer"
-                  [style.height.%]="(month.amount / maxRevenue()) * 100"
-                ></div>
-                <span class="mt-2 text-xs text-gray-600">{{ month.name }}</span>
-              </div>
-            }
+          <div class="flex items-center justify-between mb-4">
+            <div class="space-y-1">
+              <h2 class="text-lg font-semibold text-gray-900">Revenus mensuels</h2>
+              <p class="text-xs text-gray-500">Jan–Jun, total par mois</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-600">Année</span>
+              <select
+                class="input py-1 text-sm"
+                [value]="revenueYearSelected() ?? ''"
+                (change)="onRevenueYearChange($event)"
+              >
+                <option value="" disabled>Sélectionner une année</option>
+                @for (year of revenueYearOptions(); track year) {
+                  <option [value]="year">{{ year }}</option>
+                }
+              </select>
+            </div>
           </div>
+          @if (revenueError()) {
+            <p class="text-sm text-red-600">{{ revenueError() }}</p>
+          } @else if (revenueLoading()) {
+            <p class="text-sm text-gray-500">Chargement des revenus...</p>
+          } @else if (hasRevenue()) {
+            <div class="relative h-64 pl-16">
+              <div class="absolute inset-0 flex flex-col justify-between pl-16 pr-2">
+                @for (tick of revenueAxisTicks(); track $index) {
+                  <div class="border-t border-gray-100"></div>
+                }
+              </div>
+              <div class="absolute left-0 top-0 bottom-0 flex w-14 flex-col justify-between text-xs text-gray-500 pr-3">
+                @for (label of revenueAxisLabels(); track $index) {
+                  <span>{{ label }}</span>
+                }
+              </div>
+              <div class="absolute inset-0 flex items-end justify-between gap-4 pl-16 pr-2 pb-1">
+                @for (month of monthlyRevenue(); track month.name) {
+                  <div class="flex-1 flex flex-col items-center h-full">
+                    <div class="w-full flex-1 flex items-end">
+                      <div
+                        class="w-3/4 rounded-t transition-colors cursor-pointer"
+                        [ngClass]="getRevenueBarClass(month.month, month.amount)"
+                        [style.height.%]="getRevenueBarHeight(month.amount)"
+                        [attr.title]="month.amount + ' MAD'"
+                      ></div>
+                    </div>
+                    <span class="mt-3 text-xs text-gray-600">{{ month.name }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else {
+            <p class="text-sm text-gray-500">Aucun revenu pour {{ revenueYear() }}.</p>
+          }
         </div>
 
         <div class="card">
@@ -202,6 +244,11 @@ export class DashboardComponent implements OnInit {
   overview = signal<DashboardOverview | null>(null);
   loading = signal(false);
   error = signal('');
+  revenueYear = signal(new Date().getFullYear());
+  revenueYearSelected = signal<number | null>(null);
+  revenueByMonth = signal<RevenueByMonthEntry[]>([]);
+  revenueLoading = signal(false);
+  revenueError = signal('');
   invoiceStatus = signal<'all' | 'paid' | 'unpaid' | 'partially_paid' | 'overdue'>('all');
   invoiceMenuOpen = signal(false);
   quoteStatus = signal<'all' | 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'>('all');
@@ -235,16 +282,19 @@ export class DashboardComponent implements OnInit {
     this.loading.set(true);
     this.error.set('');
     try {
+      const year = this.revenueYear();
       const overview = await this.dashboardService.getOverview();
       this.overview.set(overview);
-      await Promise.all([
+    } catch (err) {
+      this.error.set('Impossible de charger les données du dashboard');
+    } finally {
+      const year = this.revenueYear();
+      await Promise.allSettled([
+        this.loadRevenue(year),
         this.invoiceService.list({ page: 1, limit: 5 }),
         this.quoteService.list({ page: 1, limit: 5, status: 'sent' }),
         this.clientService.list()
       ]);
-    } catch (err) {
-      this.error.set('Impossible de charger les données du dashboard');
-    } finally {
       this.loading.set(false);
     }
   }
@@ -314,14 +364,94 @@ export class DashboardComponent implements OnInit {
 
   monthlyRevenue = computed(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'];
-    return months.map((name) => ({
+    const byMonth = new Map<number, number>();
+    for (const entry of this.revenueByMonth()) {
+      byMonth.set(entry.month, entry.total);
+    }
+    return months.map((name, index) => ({
       name,
-      amount: Math.floor(Math.random() * 50000) + 10000
+      month: index + 1,
+      amount: byMonth.get(index + 1) ?? 0
     }));
   });
 
   maxRevenue = computed(() => {
-    return Math.max(...this.monthlyRevenue().map(m => m.amount));
+    return Math.max(1, ...this.monthlyRevenue().map(m => m.amount)) + 50;
+  });
+
+  hasRevenue = computed(() => {
+    return this.monthlyRevenue().some(m => m.amount > 0);
+  });
+
+  revenueYearOptions = computed(() => {
+    const currentYear = new Date().getFullYear();
+    const selectedYear = this.revenueYear();
+    const minYear = Math.min(currentYear - 3, selectedYear);
+    const maxYear = Math.max(currentYear + 1, selectedYear);
+    const years: number[] = [];
+    for (let year = minYear; year <= maxYear; year += 1) {
+      years.push(year);
+    }
+    return years;
+  });
+
+  async onRevenueYearChange(event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
+    if (!value) {
+      this.revenueYearSelected.set(null);
+      return;
+    }
+    const year = Number(value);
+    if (!Number.isFinite(year)) return;
+    this.revenueYear.set(year);
+    this.revenueYearSelected.set(year);
+    await this.loadRevenue(year);
+  }
+
+  async loadRevenue(year: number) {
+    this.revenueLoading.set(true);
+    this.revenueError.set('');
+    try {
+      const revenue = await this.dashboardService.getRevenueByMonth(year);
+      this.revenueByMonth.set(revenue.data);
+    } catch {
+      this.revenueError.set('Impossible de charger les revenus');
+      this.revenueByMonth.set([]);
+    } finally {
+      this.revenueLoading.set(false);
+    }
+  }
+
+  getRevenueBarHeight(amount: number): number {
+    if (amount <= 0) return 6;
+    const ratio = amount / this.maxRevenue();
+    return Math.max(12, ratio * 100);
+  }
+
+  getRevenueBarClass(month: number, amount: number): string {
+    const currentMonth = new Date().getMonth() + 1;
+    if (amount <= 0) {
+      return 'bg-gray-200';
+    }
+    if (month === currentMonth) {
+      return 'bg-amber-500 hover:bg-amber-600';
+    }
+    return 'bg-primary-500 hover:bg-primary-600';
+  }
+
+  revenueAxisLabels = computed(() => {
+    const max = this.maxRevenue();
+    const steps = 4;
+    const labels: string[] = [];
+    for (let i = steps; i >= 0; i -= 1) {
+      const value = Math.round((max * i) / steps);
+      labels.push(`${value.toLocaleString()} MAD`);
+    }
+    return labels;
+  });
+
+  revenueAxisTicks = computed(() => {
+    return new Array(this.revenueAxisLabels().length).fill(0);
   });
 
   recentInvoices = computed(() => {

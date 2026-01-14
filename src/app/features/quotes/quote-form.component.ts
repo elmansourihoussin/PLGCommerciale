@@ -19,10 +19,29 @@ import { QuoteLine } from '../../core/models/quote.model';
         </h1>
       </div>
 
+      @if (formError()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ formError() }}
+        </div>
+      }
+
       <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-6">
         <div class="card">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations générales</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Numéro *</label>
+              <input
+                type="text"
+                formControlName="number"
+                class="input"
+                placeholder="Ex: DEV-2025-001"
+              />
+              @if (isControlInvalid('number')) {
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+              }
+            </div>
+
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Client *</label>
               <select formControlName="clientId" class="input">
@@ -32,7 +51,7 @@ import { QuoteLine } from '../../core/models/quote.model';
                 }
               </select>
               @if (isControlInvalid('clientId')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -45,7 +64,7 @@ import { QuoteLine } from '../../core/models/quote.model';
                 placeholder="Ex: Travaux de plomberie"
               />
               @if (isControlInvalid('title')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -53,7 +72,7 @@ import { QuoteLine } from '../../core/models/quote.model';
               <label class="block text-sm font-medium text-gray-700 mb-2">Date *</label>
               <input type="date" formControlName="date" class="input" />
               @if (isControlInvalid('date')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -61,7 +80,7 @@ import { QuoteLine } from '../../core/models/quote.model';
               <label class="block text-sm font-medium text-gray-700 mb-2">Validité jusqu'au *</label>
               <input type="date" formControlName="validUntil" class="input" />
               @if (isControlInvalid('validUntil')) {
-                <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
 
@@ -114,7 +133,7 @@ import { QuoteLine } from '../../core/models/quote.model';
                       placeholder="Description du service/produit"
                     />
                     @if (isLineControlInvalid(i, 'description')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-1">
@@ -127,11 +146,11 @@ import { QuoteLine } from '../../core/models/quote.model';
                       min="1"
                     />
                     @if (isLineControlInvalid(i, 'quantity')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire (MAD)</label>
                     <input
                       type="number"
                       formControlName="unitPrice"
@@ -140,7 +159,7 @@ import { QuoteLine } from '../../core/models/quote.model';
                       min="0"
                     />
                     @if (isLineControlInvalid(i, 'unitPrice')) {
-                      <p class="text-xs text-red-600 mt-1">Champ obligatoire</p>
+                      <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
                     }
                   </div>
                   <div class="md:col-span-1">
@@ -225,6 +244,7 @@ export class QuoteFormComponent implements OnInit {
   isEdit = signal(false);
   clients = this.clientService.clients;
   articles = this.articleService.articles;
+  formError = signal('');
 
   form: FormGroup;
 
@@ -243,6 +263,7 @@ export class QuoteFormComponent implements OnInit {
     private fb: FormBuilder
   ) {
     this.form = this.fb.group({
+      number: ['', Validators.required],
       clientId: ['', Validators.required],
       title: ['', Validators.required],
       date: [new Date().toISOString().split('T')[0], Validators.required],
@@ -266,7 +287,9 @@ export class QuoteFormComponent implements OnInit {
     if (id) {
       this.isEdit.set(true);
       await this.loadQuote(id);
+      this.form.get('number')?.disable({ emitEvent: false });
     } else {
+      await this.loadNextNumber();
       this.addLine();
     }
   }
@@ -274,6 +297,7 @@ export class QuoteFormComponent implements OnInit {
   async loadQuote(id: string) {
     const quote = await this.quoteService.getById(id);
     this.form.patchValue({
+      number: quote.number,
       clientId: quote.clientId,
       title: quote.title,
       date: new Date(quote.date).toISOString().split('T')[0],
@@ -357,12 +381,15 @@ export class QuoteFormComponent implements OnInit {
     if (this.form.invalid || !this.areLinesValid()) {
       this.form.markAllAsTouched();
       this.lines.markAllAsTouched();
-      alert('Veuillez remplir tous les champs obligatoires');
+      this.formError.set('Veuillez remplir les champs obligatoires');
+      alert('Veuillez remplir les champs obligatoires');
       return;
     }
+    this.formError.set('');
 
     const formValue = this.form.getRawValue();
     const quoteData = {
+      number: formValue.number,
       clientId: formValue.clientId,
       title: formValue.title,
       date: formValue.date,
@@ -378,13 +405,23 @@ export class QuoteFormComponent implements OnInit {
       }))
     };
 
-    if (this.isEdit()) {
-      await this.quoteService.update(this.route.snapshot.paramMap.get('id')!, quoteData);
-    } else {
-      await this.quoteService.create(quoteData as any);
-    }
+    try {
+      if (this.isEdit()) {
+        const { number, ...updates } = quoteData;
+        await this.quoteService.update(this.route.snapshot.paramMap.get('id')!, updates);
+      } else {
+        await this.quoteService.create(quoteData as any);
+      }
 
-    this.router.navigate(['/quotes']);
+      this.router.navigate(['/quotes']);
+    } catch (err: any) {
+      const message =
+        err?.error?.message ||
+        err?.error?.error?.message ||
+        err?.message ||
+        'Impossible d’enregistrer le devis';
+      this.formError.set(message);
+    }
   }
 
   goBack() {
@@ -393,6 +430,17 @@ export class QuoteFormComponent implements OnInit {
 
   private async loadClients() {
     await this.clientService.list();
+  }
+
+  private async loadNextNumber() {
+    try {
+      const nextNumber = await this.quoteService.getNextNumber();
+      if (nextNumber) {
+        this.form.patchValue({ number: nextNumber });
+      }
+    } catch {
+      this.formError.set('Impossible de générer le numéro de devis');
+    }
   }
 
   createLine(data?: Partial<QuoteLine>): FormGroup {

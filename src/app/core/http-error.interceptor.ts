@@ -14,9 +14,18 @@ export const httpErrorInterceptor: HttpInterceptorFn = (
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
+      const isApiRequest = request.url.includes('/api/');
       if (error.status === 401 || error.status === 403) {
         authService.logout();
         router.navigate(['/auth/login']);
+      } else if (isApiRequest && error.status === 404) {
+        if (router.url !== '/errors/404') {
+          router.navigate(['/errors/404']);
+        }
+      } else if (isApiRequest && (error.status === 0 || error.status >= 500)) {
+        if (router.url !== '/errors/503') {
+          router.navigate(['/errors/503']);
+        }
       } else if (error.status >= 500) {
         console.error('Erreur serveur', error);
       }

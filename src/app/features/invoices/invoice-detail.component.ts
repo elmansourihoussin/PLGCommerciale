@@ -117,7 +117,10 @@ import { InvoicePaymentsComponent } from './invoice-payments.component';
         </div>
       </div>
 
-      <app-invoice-payments [invoiceId]="invoiceId()"></app-invoice-payments>
+      <app-invoice-payments
+        [invoiceId]="invoiceId()"
+        (paymentsChanged)="refreshInvoice()"
+      ></app-invoice-payments>
     </div>
   `
 })
@@ -150,6 +153,12 @@ export class InvoiceDetailComponent implements OnInit {
     }
   }
 
+  async refreshInvoice() {
+    const id = this.invoiceId();
+    if (!id) return;
+    await this.loadInvoice(id);
+  }
+
   totalPaid = computed(() => this.paymentsTotal());
 
   balanceDue = computed(() => {
@@ -160,6 +169,7 @@ export class InvoiceDetailComponent implements OnInit {
 
   getStatusBadgeClass(status?: string): string {
     const classes: Record<string, string> = {
+      draft: 'badge-info',
       paid: 'badge-success',
       unpaid: 'badge-warning',
       partially_paid: 'badge-info',
@@ -170,6 +180,7 @@ export class InvoiceDetailComponent implements OnInit {
 
   getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
+      draft: 'Brouillon',
       paid: 'Payée',
       unpaid: 'Impayée',
       partially_paid: 'Part. payée',

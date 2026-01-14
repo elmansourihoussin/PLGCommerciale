@@ -26,7 +26,7 @@ export interface Invoice {
   taxAmount: number;
   total: number;
   paidAmount: number;
-  status: 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
+  status: 'draft' | 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
   paymentMethod?: 'cash' | 'check' | 'bank_transfer' | 'card';
   notes?: string;
   createdAt: Date;
