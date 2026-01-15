@@ -2,7 +2,7 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { PlatformTenantService } from '../../core/services/platform-tenant.service';
+import { PlatformTenantService, PlatformTenantStats } from '../../core/services/platform-tenant.service';
 import { PlatformTenant } from '../../core/models/platform-tenant.model';
 
 @Component({
@@ -22,6 +22,31 @@ import { PlatformTenant } from '../../core/models/platform-tenant.model';
       @if (error()) {
         <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {{ error() }}
+        </div>
+      }
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card">
+          <p class="text-sm text-gray-600">Total entreprises</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ stats().totalCompanies }}</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Entreprises actives</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ stats().activeCompanies }}</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Plan Gratuit</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ stats().freeCompanies }}</p>
+        </div>
+        <div class="card">
+          <p class="text-sm text-gray-600">Plan Pro</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ stats().proCompanies }}</p>
+        </div>
+      </div>
+
+      @if (statsError()) {
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">
+          {{ statsError() }}
         </div>
       }
 
@@ -117,6 +142,13 @@ export class PlatformTenantListComponent implements OnInit {
   tenants = this.platformTenantService.tenants;
   loading = signal(false);
   error = signal('');
+  stats = signal<PlatformTenantStats>({
+    totalCompanies: 0,
+    activeCompanies: 0,
+    freeCompanies: 0,
+    proCompanies: 0
+  });
+  statsError = signal('');
   searchTerm = signal('');
   page = signal(1);
   pageSize = signal(10);
@@ -124,7 +156,7 @@ export class PlatformTenantListComponent implements OnInit {
   constructor(private platformTenantService: PlatformTenantService) {}
 
   async ngOnInit() {
-    await this.loadTenants();
+    await Promise.all([this.loadTenants(), this.loadStats()]);
   }
 
   async loadTenants() {
@@ -157,9 +189,19 @@ export class PlatformTenantListComponent implements OnInit {
   async toggleStatus(tenant: PlatformTenant) {
     try {
       await this.platformTenantService.updateStatus(tenant.id, !tenant.isActive);
-      await this.loadTenants();
+      await Promise.all([this.loadTenants(), this.loadStats()]);
     } catch {
       this.error.set('Impossible de modifier le statut');
+    }
+  }
+
+  async loadStats() {
+    this.statsError.set('');
+    try {
+      const stats = await this.platformTenantService.getStats();
+      this.stats.set(stats);
+    } catch {
+      this.statsError.set('Impossible de charger les statistiques');
     }
   }
 

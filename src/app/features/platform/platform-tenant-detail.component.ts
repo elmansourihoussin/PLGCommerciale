@@ -55,14 +55,24 @@ import { PlatformTenant, PlatformTenantHistoryEntry } from '../../core/models/pl
           <form [formGroup]="subscriptionForm" (ngSubmit)="updateSubscription()" class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-              <input type="text" formControlName="plan" class="input" placeholder="PRO" />
+              <select formControlName="plan" class="input">
+                <option value="" disabled>Choisir un plan</option>
+                @for (option of planOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
               @if (isSubscriptionInvalid('plan')) {
                 <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-              <input type="text" formControlName="status" class="input" placeholder="ACTIVE" />
+              <select formControlName="status" class="input">
+                <option value="" disabled>Choisir un statut</option>
+                @for (option of statusOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
               @if (isSubscriptionInvalid('status')) {
                 <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
               }
@@ -122,6 +132,17 @@ export class PlatformTenantDetailComponent implements OnInit {
   error = signal('');
 
   subscriptionForm: FormGroup;
+  planOptions = [
+    { value: 'FREE', label: 'Gratuit' },
+    { value: 'STARTER', label: 'Starter' },
+    { value: 'PRO', label: 'Pro' },
+    { value: 'ENTERPRISE', label: 'Entreprise' }
+  ];
+  statusOptions = [
+    { value: 'ACTIVE', label: 'Actif' },
+    { value: 'INACTIVE', label: 'Inactif' },
+    { value: 'CANCELLED', label: 'Annulé' }
+  ];
 
   constructor(
     private platformTenantService: PlatformTenantService,

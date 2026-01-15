@@ -42,6 +42,13 @@ interface HistoryResponse {
   };
 }
 
+export interface PlatformTenantStats {
+  totalCompanies: number;
+  activeCompanies: number;
+  freeCompanies: number;
+  proCompanies: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -96,6 +103,20 @@ export class PlatformTenantService {
       .then((response) => this.normalizeTenant(response));
   }
 
+  getStats(): Promise<PlatformTenantStats> {
+    const url = `${this.configService.apiBaseUrl}/api/platform/tenants/stats`;
+    return firstValueFrom(this.http.get<any>(url))
+      .then((response) => {
+        const data = response?.data ?? response ?? {};
+        return {
+          totalCompanies: this.toNumber(data.totalCompanies),
+          activeCompanies: this.toNumber(data.activeCompanies),
+          freeCompanies: this.toNumber(data.freeCompanies),
+          proCompanies: this.toNumber(data.proCompanies)
+        };
+      });
+  }
+
   getBillingHistory(id: string, params?: { page?: number; limit?: number }): Promise<{ entries: PlatformTenantHistoryEntry[]; meta?: HistoryResponse['meta'] }> {
     const url = new URL(`${this.configService.apiBaseUrl}/api/platform/tenants/${encodeURIComponent(id)}/billing-history`);
     if (params?.page) url.searchParams.set('page', String(params.page));
@@ -138,5 +159,15 @@ export class PlatformTenantService {
 
   private isTenantResponse(response: TenantResponse | ApiTenant): response is TenantResponse {
     return 'data' in response || 'tenant' in response;
+  }
+
+  private toNumber(value: unknown): number {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    if (typeof value === 'string') {
+      const normalized = value.replace(/[^0-9.-]+/g, '');
+      const parsed = Number(normalized);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
   }
 }

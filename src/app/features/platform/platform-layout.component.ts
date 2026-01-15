@@ -24,14 +24,29 @@ import { PlatformAuthService } from '../../core/services/platform-auth.service';
 
       <div class="flex">
         <aside class="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] px-4 py-6">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-3">Navigation</div>
           <nav class="space-y-2">
-            <a routerLink="/platform/tenants" routerLinkActive="bg-gray-900 text-white"
-               class="block px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100">
-              Entreprises
+            <a
+              routerLink="/platform/tenants"
+              routerLinkActive="bg-gray-900 text-white shadow-sm"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700"
+            >
+              <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M4 21V7a2 2 0 012-2h3m4 0h3a2 2 0 012 2v14M9 21V9m6 12V9"/>
+              </svg>
+              <span class="text-sm font-medium">Entreprises</span>
             </a>
-            <a routerLink="/platform/tenants/new" routerLinkActive="bg-gray-900 text-white"
-               class="block px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100">
-              Nouvelle entreprise
+            <a
+              routerLink="/platform/tenants/new"
+              routerLinkActive="bg-gray-900 text-white shadow-sm"
+              [routerLinkActiveOptions]="{ exact: true }"
+              class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700"
+            >
+              <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/>
+              </svg>
+              <span class="text-sm font-medium">Nouvelle entreprise</span>
             </a>
           </nav>
         </aside>
