@@ -24,101 +24,125 @@ import { AuthService } from '../../core/services/auth.service';
               </div>
             }
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
-              <input
-                type="text"
-                formControlName="companyName"
-                class="input"
-                placeholder="Atelier Atlas"
-              />
-              @if (isControlRequired('companyName')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              }
+            <div class="flex items-center justify-between text-sm text-gray-500">
+              <span [class]="currentStep() === 1 ? 'text-gray-900 font-semibold' : ''">Étape 1: Utilisateur</span>
+              <span [class]="currentStep() === 2 ? 'text-gray-900 font-semibold' : ''">Étape 2: Entreprise</span>
             </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-              <input
-                type="tel"
-                formControlName="phone"
-                class="input"
-                placeholder="0600000000"
-              />
-              @if (isControlRequired('phone')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              } @else if (isControlError('phone', 'pattern')) {
-                <p class="text-xs text-red-600 mt-1">Téléphone invalide (format marocain)</p>
-              }
-            </div>
+            @if (currentStep() === 1) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+                <input
+                  type="text"
+                  formControlName="fullName"
+                  class="input"
+                  placeholder="Owner Atlas"
+                />
+                @if (isControlRequired('fullName')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                }
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Email de l'entreprise</label>
-              <input
-                type="email"
-                formControlName="companyEmail"
-                class="input"
-                placeholder="contact@atlas.ma"
-              />
-              @if (isControlRequired('companyEmail')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              } @else if (isControlError('companyEmail', 'email')) {
-                <p class="text-xs text-red-600 mt-1">Email invalide</p>
-              }
-            </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+                <input
+                  type="password"
+                  formControlName="password"
+                  class="input"
+                  placeholder="••••••••"
+                />
+                @if (isControlRequired('password')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                }
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
-              <input
-                type="text"
-                formControlName="fullName"
-                class="input"
-                placeholder="Owner Atlas"
-              />
-              @if (isControlRequired('fullName')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              }
-            </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  formControlName="confirmPassword"
+                  class="input"
+                  placeholder="••••••••"
+                />
+                @if (isControlRequired('confirmPassword')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                } @else if (form.get('confirmPassword')?.touched && form.get('confirmPassword')?.value && form.get('password')?.value && form.get('confirmPassword')?.value !== form.get('password')?.value) {
+                  <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
+                }
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-              <input
-                type="password"
-                formControlName="password"
-                class="input"
-                placeholder="••••••••"
-              />
-              @if (isControlRequired('password')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              }
-            </div>
+              <button
+                type="button"
+                class="w-full btn-primary"
+                (click)="goToCompanyStep()"
+              >
+                Suivant
+              </button>
+            } @else {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
+                <input
+                  type="text"
+                  formControlName="companyName"
+                  class="input"
+                  placeholder="Atelier Atlas"
+                />
+                @if (isControlRequired('companyName')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                }
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
-              <input
-                type="password"
-                formControlName="confirmPassword"
-                class="input"
-                placeholder="••••••••"
-              />
-              @if (isControlRequired('confirmPassword')) {
-                <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
-              } @else if (form.get('confirmPassword')?.touched && form.get('confirmPassword')?.value && form.get('password')?.value && form.get('confirmPassword')?.value !== form.get('password')?.value) {
-                <p class="text-xs text-red-600 mt-1">Les mots de passe ne correspondent pas</p>
-              }
-            </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                <input
+                  type="tel"
+                  formControlName="phone"
+                  class="input"
+                  placeholder="0600000000"
+                />
+                @if (isControlRequired('phone')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                } @else if (isControlError('phone', 'pattern')) {
+                  <p class="text-xs text-red-600 mt-1">Téléphone invalide (format marocain)</p>
+                }
+              </div>
 
-            <button
-              type="submit"
-              [disabled]="loading() || form.invalid || !passwordsMatch()"
-              class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              @if (loading()) {
-                <span>Création en cours...</span>
-              } @else {
-                <span>Créer mon compte</span>
-              }
-            </button>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email de l'entreprise</label>
+                <input
+                  type="email"
+                  formControlName="companyEmail"
+                  class="input"
+                  placeholder="contact@atlas.ma"
+                />
+                @if (isControlRequired('companyEmail')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                } @else if (isControlError('companyEmail', 'email')) {
+                  <p class="text-xs text-red-600 mt-1">Email invalide</p>
+                }
+              </div>
+
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  class="w-full btn-secondary"
+                  (click)="goToUserStep()"
+                >
+                  Précédent
+                </button>
+                <button
+                  type="submit"
+                  [disabled]="loading() || form.invalid || !passwordsMatch()"
+                  class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  @if (loading()) {
+                    <span>Création en cours...</span>
+                  } @else {
+                    <span>Créer mon compte</span>
+                  }
+                </button>
+              </div>
+            }
 
             <p class="text-center text-sm text-gray-600">
               Déjà un compte?
@@ -135,6 +159,7 @@ import { AuthService } from '../../core/services/auth.service';
 export class RegisterComponent {
   loading = signal(false);
   error = signal('');
+  currentStep = signal<1 | 2>(1);
   form: FormGroup;
   private phonePattern = /^(?:\+212|0)[5-7]\d{8}$/;
 
@@ -154,6 +179,9 @@ export class RegisterComponent {
   }
 
   async onSubmit() {
+    if (this.currentStep() !== 2) {
+      return;
+    }
     if (this.form.invalid || !this.passwordsMatch()) {
       this.form.markAllAsTouched();
       this.error.set('Veuillez remplir les champs obligatoires');
@@ -193,5 +221,37 @@ export class RegisterComponent {
 
   passwordsMatch(): boolean {
     return Boolean(this.form.get('password')?.value) && this.form.get('password')?.value === this.form.get('confirmPassword')?.value;
+  }
+
+  goToCompanyStep() {
+    this.error.set('');
+    this.touchStepControls(1);
+    if (!this.isStepValid(1)) {
+      this.error.set('Veuillez remplir les champs obligatoires');
+      return;
+    }
+    this.currentStep.set(2);
+  }
+
+  goToUserStep() {
+    this.error.set('');
+    this.currentStep.set(1);
+  }
+
+  private isStepValid(step: 1 | 2): boolean {
+    const controls = step === 1
+      ? ['fullName', 'password', 'confirmPassword']
+      : ['companyName', 'phone', 'companyEmail'];
+    if (step === 1 && !this.passwordsMatch()) {
+      return false;
+    }
+    return controls.every((name) => this.form.get(name)?.valid);
+  }
+
+  private touchStepControls(step: 1 | 2) {
+    const controls = step === 1
+      ? ['fullName', 'password', 'confirmPassword']
+      : ['companyName', 'phone', 'companyEmail'];
+    controls.forEach((name) => this.form.get(name)?.markAsTouched());
   }
 }
