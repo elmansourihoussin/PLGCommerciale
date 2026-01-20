@@ -16,8 +16,11 @@ export const httpErrorInterceptor: HttpInterceptorFn = (
     catchError((error: HttpErrorResponse) => {
       const isApiRequest = request.url.includes('/api/');
       if (error.status === 401 || error.status === 403) {
-        authService.logout();
-        router.navigate(['/auth/login']);
+        const isPlatformRequest = request.url.includes('/api/platform/');
+        if (!isPlatformRequest) {
+          authService.logout();
+          router.navigate(['/auth/login']);
+        }
       } else if (isApiRequest && error.status === 404) {
         if (router.url !== '/errors/404') {
           router.navigate(['/errors/404']);
