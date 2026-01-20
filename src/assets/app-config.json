@@ -1,3 +1,4 @@
 {
-  "apiBaseUrl": "http://localhost:3000"
+  "apiBaseUrl": "http://localhost:3000",
+  "platformApiKey": "cd0582a0cd57600a361e6d0ca279692b12d07ec3ba8004d8ab010c5616ddd925"
 }

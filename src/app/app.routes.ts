@@ -1,7 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
-import { platformAuthGuard } from './core/guards/platform-auth.guard';
 
 export const routes: Routes = [
   {
@@ -14,7 +13,6 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () => import('./features/platform/platform-layout.component').then(m => m.PlatformLayoutComponent),
-        canActivate: [platformAuthGuard],
         children: [
           {
             path: 'tenants',

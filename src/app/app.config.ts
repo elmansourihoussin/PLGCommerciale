@@ -4,14 +4,14 @@ import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { AppConfigService } from './core/config/app-config.service';
 import { httpAuthInterceptor } from './core/http-auth.interceptor';
-import { httpPlatformAuthInterceptor } from './core/http-platform-auth.interceptor';
 import { httpErrorInterceptor } from './core/http-error.interceptor';
 import { httpRefreshInterceptor } from './core/http-refresh.interceptor';
+import { httpPlatformApiKeyInterceptor } from './core/http-platform-api-key.interceptor';
 
 export const appConfig: ApplicationConfig = {
     providers: [
         provideRouter(routes),
-        provideHttpClient(withInterceptors([httpPlatformAuthInterceptor, httpAuthInterceptor, httpErrorInterceptor, httpRefreshInterceptor])),
+        provideHttpClient(withInterceptors([httpPlatformApiKeyInterceptor, httpAuthInterceptor, httpErrorInterceptor, httpRefreshInterceptor])),
         {
             provide: APP_INITIALIZER,
             multi: true,

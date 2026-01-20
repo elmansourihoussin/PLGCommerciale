@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 export interface AppConfig {
   apiBaseUrl: string;
+  platformApiKey?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -24,5 +25,9 @@ export class AppConfigService {
 
   get apiBaseUrl(): string {
     return this.config?.apiBaseUrl ?? '';
+  }
+
+  get platformApiKey(): string {
+    return this.config?.platformApiKey ?? '';
   }
 }

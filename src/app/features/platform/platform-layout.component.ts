@@ -1,7 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { PlatformAuthService } from '../../core/services/platform-auth.service';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-platform-layout',
@@ -19,7 +18,6 @@ import { PlatformAuthService } from '../../core/services/platform-auth.service';
             <h1 class="text-sm font-semibold text-gray-900">Console</h1>
           </div>
         </div>
-        <button class="btn-secondary" (click)="logout()">Déconnexion</button>
       </header>
 
       <div class="flex">
@@ -59,13 +57,5 @@ import { PlatformAuthService } from '../../core/services/platform-auth.service';
   `
 })
 export class PlatformLayoutComponent {
-  constructor(
-    private platformAuthService: PlatformAuthService,
-    private router: Router
-  ) {}
-
-  logout() {
-    this.platformAuthService.logout();
-    this.router.navigate(['/platform/login']);
-  }
+  constructor() {}
 }
