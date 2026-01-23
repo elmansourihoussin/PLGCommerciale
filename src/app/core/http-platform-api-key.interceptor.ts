@@ -1,7 +1,7 @@
 import { HttpEvent, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { inject } from '@angular/core';
-import { AppConfigService } from './config/app-config.service';
+import { PlatformAuthService } from './services/platform-auth.service';
 
 export const httpPlatformApiKeyInterceptor: HttpInterceptorFn = (
   request: HttpRequest<unknown>,
@@ -11,16 +11,16 @@ export const httpPlatformApiKeyInterceptor: HttpInterceptorFn = (
     return next(request);
   }
 
-  const configService = inject(AppConfigService);
-  const apiKey = configService.platformApiKey;
+  const platformAuthService = inject(PlatformAuthService);
+  const token = platformAuthService.accessToken();
 
-  if (!apiKey || request.headers.has('x-api-key')) {
+  if (!token || request.headers.has('Authorization')) {
     return next(request);
   }
 
   return next(request.clone({
     setHeaders: {
-      'x-api-key': apiKey
+      Authorization: `Bearer ${token}`
     }
   }));
 };
