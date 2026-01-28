@@ -2,6 +2,7 @@ import { Component, computed, effect, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { CompanyService } from '../../core/services/company.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -31,6 +32,18 @@ import { AuthService } from '../../core/services/auth.service';
             </svg>
           </button>
         </div>
+
+        @if (company()?.logo) {
+          <div class="px-4 py-4 border-b border-gray-200 flex items-center justify-center">
+            <img
+              [src]="company()?.logo"
+              alt="Logo entreprise"
+              class="h-12 w-12 object-contain"
+              [class.h-10]="isCollapsed()"
+              [class.w-10]="isCollapsed()"
+            />
+          </div>
+        }
 
         <nav class="flex-1 px-2 py-6 space-y-1 overflow-y-auto">
           <a routerLink="/dashboard" routerLinkActive="bg-primary-50 text-primary-700"
@@ -138,18 +151,25 @@ export class SidebarComponent {
   isOpen = signal(false);
   isCollapsed = signal(false);
   currentUser = this.authService.currentUser;
+  company = this.companyService.company;
   isAdmin = computed(() => {
     const role = this.currentUser()?.role;
     return role === 'owner' || role === 'admin';
   });
 
-  constructor(private authService: AuthService) {
+  constructor(private authService: AuthService, private companyService: CompanyService) {
     this.loadCollapsedState();
 
     effect(() => {
       const collapsed = this.isCollapsed();
       this.persistCollapsedState(collapsed);
       this.applySidebarWidth(collapsed);
+    });
+
+    effect(() => {
+      this.companyService.refresh().catch(() => {
+        // ignore refresh errors
+      });
     });
 
     // Ensure width is applied on init

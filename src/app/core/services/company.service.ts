@@ -14,6 +14,9 @@ interface ApiTenant {
   id?: string;
   name?: string;
   companyName?: string;
+  logo?: string;
+  logoUrl?: string;
+  logo_url?: string;
   ice?: string;
   email?: string;
   companyEmail?: string;
@@ -73,12 +76,26 @@ export class CompanyService {
       });
   }
 
+  uploadLogo(file: File): Promise<Company> {
+    const url = `${this.configService.apiBaseUrl}/api/tenant/me/logo`;
+    const formData = new FormData();
+    formData.append('file', file);
+    return firstValueFrom(this.http.patch<TenantResponse | ApiTenant>(url, formData, { headers: this.authHeaders() }))
+      .then((response) => {
+        const current = this.companySignal() ?? {};
+        const company = this.normalizeCompany(response ?? {}, current);
+        this.companySignal.set(company);
+        return company;
+      });
+  }
+
   private normalizeCompany(response: TenantResponse | ApiTenant, fallback: Partial<Company>): Company {
     const tenant = this.extractTenant(response);
 
     return {
       id: tenant.id ?? fallback.id ?? '1',
       name: tenant.name ?? tenant.companyName ?? fallback.name ?? '',
+      logo: this.resolveLogoUrl(tenant.logo ?? tenant.logoUrl ?? tenant.logo_url ?? fallback.logo),
       ice: tenant.ice ?? fallback.ice ?? '',
       email: tenant.email ?? tenant.companyEmail ?? fallback.email ?? '',
       phone: tenant.phone ?? fallback.phone ?? '',
@@ -123,5 +140,28 @@ export class CompanyService {
       return new HttpHeaders();
     }
     return new HttpHeaders({ Authorization: `Bearer ${token}` });
+  }
+
+  logoUrl(): string {
+    const base = this.configService.apiBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+    const origin = base ? new URL(base, base).origin : '';
+    return `${origin}`;
+  }
+
+  private resolveLogoUrl(raw?: string): string | undefined {
+    if (!raw) {
+      return undefined;
+    }
+    if (/^https?:\/\//i.test(raw)) {
+      return raw;
+    }
+    const base = this.logoUrl();
+    if (!base) {
+      return raw.startsWith('/') ? raw : `/${raw}`;
+    }
+    if (raw.startsWith('/')) {
+      return `${base}${raw}`;
+    }
+    return `${base}/${raw}`;
   }
 }

@@ -22,6 +22,9 @@ export const httpErrorInterceptor: HttpInterceptorFn = (
           router.navigate(['/auth/login']);
         }
       } else if (isApiRequest && error.status === 404) {
+        if (request.url.includes('/api/tenant/me/logo')) {
+          return throwError(() => error);
+        }
         if (router.url !== '/errors/404') {
           router.navigate(['/errors/404']);
         }

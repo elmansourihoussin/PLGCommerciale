@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UserListComponent } from '../users/user-list.component';
@@ -69,6 +69,54 @@ import { Company } from '../../core/models/company.model';
                   {{ companySuccess() }}
                 </div>
               }
+              <div class="card">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Logo de l'entreprise</h2>
+                    <p class="text-sm text-gray-600">Ajoutez un logo qui s'affichera au-dessus du menu.</p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <input
+                      #logoInput
+                      type="file"
+                      accept="image/*"
+                      class="hidden"
+                      (change)="onLogoSelected($event)"
+                    />
+                    <button type="button" class="btn-outline" (click)="logoInput.click()" [disabled]="logoLoading()">
+                      @if (logoLoading()) {
+                        <span>Envoi...</span>
+                      } @else {
+                        <span>Ajouter un logo</span>
+                      }
+                    </button>
+                  </div>
+                </div>
+                @if (logoError()) {
+                  <div class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    {{ logoError() }}
+                  </div>
+                }
+                @if (logoSuccess()) {
+                  <div class="mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                    {{ logoSuccess() }}
+                  </div>
+                }
+                <div class="mt-4 flex items-center gap-4">
+                  <div class="w-20 h-20 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                    @if (logoPreviewUrl()) {
+                      <img [src]="logoPreviewUrl()" alt="Logo de l'entreprise" class="w-full h-full object-contain" />
+                    } @else if (company()?.logo) {
+                      <img [src]="company()?.logo" alt="Logo de l'entreprise" class="w-full h-full object-contain" />
+                    } @else {
+                      <span class="text-xs text-gray-400">Aucun logo</span>
+                    }
+                  </div>
+                  <div class="text-sm text-gray-600">
+                    Formats supportés : PNG, JPG, SVG.
+                  </div>
+                </div>
+              </div>
               <div class="card">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Informations de l'entreprise</h2>
                 <div class="space-y-4">
@@ -270,12 +318,17 @@ import { Company } from '../../core/models/company.model';
     </div>
   `
 })
-export class SettingsComponent implements OnInit {
+export class SettingsComponent implements OnInit, OnDestroy {
   activeTab: 'company' | 'profile' | 'users' = 'company';
   currentUser = this.authService.currentUser;
+  company = this.companyService.company;
   companyLoading = signal(false);
   companyError = signal('');
   companySuccess = signal('');
+  logoLoading = signal(false);
+  logoError = signal('');
+  logoSuccess = signal('');
+  logoPreviewUrl = signal('');
   passwordLoading = signal(false);
   passwordError = signal('');
   passwordSuccess = signal('');
@@ -291,6 +344,7 @@ export class SettingsComponent implements OnInit {
 
   private phonePattern = /^(?:\+212|0)[5-7]\d{8}$/;
   private icePattern = /^\d{15}$/;
+  private logoObjectUrl: string | null = null;
 
   constructor(
     private companyService: CompanyService,
@@ -321,6 +375,10 @@ export class SettingsComponent implements OnInit {
 
   async ngOnInit() {
     await this.refreshCompany();
+  }
+
+  ngOnDestroy() {
+    this.revokeLogoPreview();
   }
 
   async saveCompany() {
@@ -358,6 +416,7 @@ export class SettingsComponent implements OnInit {
       this.companyLoading.set(false);
     }
   }
+
 
   getUserInitials(): string {
     const name = this.currentUser()?.name || '';
@@ -426,4 +485,48 @@ export class SettingsComponent implements OnInit {
   passwordsMatch(): boolean {
     return this.passwordForm.value.newPassword === this.passwordForm.value.confirmPassword;
   }
+
+  async onLogoSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    this.logoError.set('');
+    this.logoSuccess.set('');
+
+    if (!file.type.startsWith('image/')) {
+      this.logoError.set('Veuillez sélectionner une image.');
+      input.value = '';
+      return;
+    }
+
+    this.setLogoPreview(file);
+    this.logoLoading.set(true);
+    try {
+      await this.companyService.uploadLogo(file);
+      this.logoSuccess.set('Logo mis à jour');
+      this.logoPreviewUrl.set('');
+      this.revokeLogoPreview();
+    } catch {
+      this.logoError.set('Impossible de mettre à jour le logo');
+    } finally {
+      this.logoLoading.set(false);
+      input.value = '';
+    }
+  }
+
+  private setLogoPreview(file: File) {
+    this.revokeLogoPreview();
+    this.logoObjectUrl = URL.createObjectURL(file);
+    this.logoPreviewUrl.set(this.logoObjectUrl);
+  }
+
+  private revokeLogoPreview() {
+    if (this.logoObjectUrl) {
+      URL.revokeObjectURL(this.logoObjectUrl);
+      this.logoObjectUrl = null;
+    }
+  }
+
 }
