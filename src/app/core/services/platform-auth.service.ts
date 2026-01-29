@@ -25,10 +25,6 @@ export class PlatformAuthService {
     this.loadToken();
   }
 
-  accessToken(): string | null {
-    return this.accessTokenSignal();
-  }
-
   async login(payload: { email: string; password: string }): Promise<void> {
     const url = `${this.configService.apiBaseUrl}/api/platform/auth/login`;
     const response = await firstValueFrom(this.http.post<PlatformLoginResponse>(url, payload));
