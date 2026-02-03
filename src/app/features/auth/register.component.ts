@@ -44,6 +44,21 @@ import { AuthService } from '../../core/services/auth.service';
               </div>
 
               <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email de connexion</label>
+                <input
+                  type="email"
+                  formControlName="email"
+                  class="input"
+                  placeholder="owner@atlas.ma"
+                />
+                @if (isControlRequired('email')) {
+                  <p class="text-xs text-red-600 mt-1">Ce champ est obligatoire</p>
+                } @else if (isControlError('email', 'email')) {
+                  <p class="text-xs text-red-600 mt-1">Email invalide</p>
+                }
+              </div>
+
+              <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
                 <input
                   type="password"
@@ -173,6 +188,7 @@ export class RegisterComponent {
       phone: ['', [Validators.required, Validators.pattern(this.phonePattern)]],
       companyEmail: ['', [Validators.required, Validators.email]],
       fullName: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required]
     });
@@ -198,6 +214,7 @@ export class RegisterComponent {
         companyName: formValue.companyName,
         phone: formValue.phone,
         companyEmail: formValue.companyEmail,
+        email: formValue.email,
         password: formValue.password,
         fullName: formValue.fullName
       });
@@ -240,7 +257,7 @@ export class RegisterComponent {
 
   private isStepValid(step: 1 | 2): boolean {
     const controls = step === 1
-      ? ['fullName', 'password', 'confirmPassword']
+      ? ['fullName', 'email', 'password', 'confirmPassword']
       : ['companyName', 'phone', 'companyEmail'];
     if (step === 1 && !this.passwordsMatch()) {
       return false;
@@ -250,7 +267,7 @@ export class RegisterComponent {
 
   private touchStepControls(step: 1 | 2) {
     const controls = step === 1
-      ? ['fullName', 'password', 'confirmPassword']
+      ? ['fullName', 'email', 'password', 'confirmPassword']
       : ['companyName', 'phone', 'companyEmail'];
     controls.forEach((name) => this.form.get(name)?.markAsTouched());
   }

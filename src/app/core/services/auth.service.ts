@@ -8,6 +8,7 @@ export interface RegisterPayload {
   companyName: string;
   phone: string;
   companyEmail: string;
+  email: string;
   password: string;
   fullName: string;
 }
@@ -80,7 +81,7 @@ export class AuthService {
     const url = `${this.configService.apiBaseUrl}/api/auth/register`;
     return firstValueFrom(this.http.post<RegisterResponse>(url, payload))
       .then((response) => {
-        const user = this.normalizeUser(response, { email: payload.companyEmail, name: payload.fullName });
+        const user = this.normalizeUser(response, { email: payload.email, name: payload.fullName });
         this.currentUserSignal.set(user);
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
         return user;
